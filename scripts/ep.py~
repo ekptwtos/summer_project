@@ -126,10 +126,10 @@ class MoveItDemo:
         self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
 
         # Run and keep in the BG the scene generator also add the ability to kill the code with ctrl^c
-#        timerThread = threading.Thread(target=self.scene_generator)
-#        timerThread.daemon = True
-#        timerThread.start()
-        self.scene_generator()
+        timerThread = threading.Thread(target=self.scene_generator)
+        timerThread.daemon = True
+        timerThread.start()
+
 
 
         print "==================== Generating Transformations ========================="
@@ -334,7 +334,7 @@ class MoveItDemo:
         g.grasp_posture = self.make_gripper_posture(GRIPPER_CLOSED)
 
         # Set the approach and retreat parameters as desired
-        g.pre_grasp_approach = self.make_gripper_translation(0.05, 0.1, [1.0, 0.0, 0.0])
+        g.pre_grasp_approach = self.make_gripper_translation(0.18, 0.1, [1.0, 0.0, 0.0])
         g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, [0.0, -1.0, 1.0])
 
         # Set the first grasp pose to the input pose
@@ -436,54 +436,52 @@ class MoveItDemo:
         global target_id
         global target_size
 
-#        next_call = time.time()
-#        while True:
-#            next_call = next_call+1
-        target_id = 'target'
-        self.taid = self.pwh.name.index('wood_cube_5cm')
-        table_id = 'table'
-        self.tid = self.pwh.name.index('table') 
+        next_call = time.time()
+        while True:
+            next_call = next_call+1
+            target_id = 'target'
+            self.taid = self.pwh.name.index('wood_cube_5cm')
+            table_id = 'table'
+            self.tid = self.pwh.name.index('table') 
 #            obstacle1_id = 'obstacle1'
 #            self.o1id = self.pwh.name.index('wood_block_10_2_1cm')
 
 
             # Set the target size [l, w, h]
-        target_size = [0.05, 0.05, 0.05]
-        table_size = [1.5, 0.8, 0.03]
+            target_size = [0.05, 0.05, 0.05]
+            table_size = [1.5, 0.8, 0.03]
 #            obstacle1_size = [0.1, 0.025, 0.01]
 
             ## Set the target pose on the table
-        target_pose = PoseStamped()
-        target_pose.header.frame_id = REFERENCE_FRAME
-        target_pose.pose = self.pwh.pose[self.taid]
-        target_pose.pose.position.z += 0.025
+            target_pose = PoseStamped()
+            target_pose.header.frame_id = REFERENCE_FRAME
+            target_pose.pose = self.pwh.pose[self.taid]
+            target_pose.pose.position.z += 0.025
+            if self.obj_att is None:
+                # Add the target object to the scene
+                self.scene.add_box(target_id, target_pose, target_size)
 
-#            if self.obj_att is None:
-
-            # Add the target object to the scene
-        self.scene.add_box(target_id, target_pose, target_size)
-
-        table_pose = PoseStamped()
-        table_pose.header.frame_id = REFERENCE_FRAME
-        table_pose.pose = self.pwh.pose[self.tid]
-        table_pose.pose.position.z += 1
-        self.scene.add_box(table_id, table_pose, table_size)
-            
+                table_pose = PoseStamped()
+                table_pose.header.frame_id = REFERENCE_FRAME
+                table_pose.pose = self.pwh.pose[self.tid]
+                table_pose.pose.position.z += 1
+                self.scene.add_box(table_id, table_pose, table_size)
+                
 #                obstacle1_pose = PoseStamped()
 #                obstacle1_pose.header.frame_id = REFERENCE_FRAME
 #                obstacle1_pose.pose = self.pwh.pose[self.o1id]
 #                # Add the target object to the scene
 #                self.scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
 
-            ### Make the target purple ###
-        self.setColor(target_id, 0.6, 0, 1, 1.0)
+                ### Make the target purple ###
+                self.setColor(target_id, 0.6, 0, 1, 1.0)
 
-            # Send the colors to the planning scene
-        self.sendColors()
-#            else: 
-#                self.scene.remove_world_object('target')
+                # Send the colors to the planning scene
+                self.sendColors()
+            else: 
+                self.scene.remove_world_object('target')
 
-#            time.sleep(next_call - time.time())
+            time.sleep(next_call - time.time())
         #threading.Timer(0.5, self.scene_generator).start()
 
 

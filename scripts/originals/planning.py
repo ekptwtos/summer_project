@@ -170,6 +170,7 @@ class MoveItDemo:
 
         # Initialize the grasp pose to the target pose
         grasp_pose = target_pose
+        grasp_pose.header.frame_id = 'gazebo_wolrd'
 
         # Shift the grasp pose by half the width of the target to center it
 
@@ -259,14 +260,6 @@ class MoveItDemo:
         self.pwh = ModelStates()
         self.pwh = msg
 
-#        #find the index of the target
-#        self.idx_targ = msg.name.index('wood_cube_5cm')
-#        #self.idx_targ = msg.name.index('tube_2_25cm_0')
-#        self.pwh = PoseStamped()
-#        #with the index get the pose from the target objext
-#        #self.pwh.header.frame_id = 'base_footprint'
-#        self.pwh.pose = msg.pose[self.idx_targ]
-
 
     # Get the gripper posture as a JointTrajectory
     def make_gripper_posture(self, joint_positions):
@@ -322,7 +315,7 @@ class MoveItDemo:
         g.grasp_posture = self.make_gripper_posture(GRIPPER_CLOSED)
 
         # Set the approach and retreat parameters as desired
-        g.pre_grasp_approach = self.make_gripper_translation(0.05, 0.1, [1.0, 0.0, 0.0])
+        g.pre_grasp_approach = self.make_gripper_translation(0.18, 0.1, [0.0, 0.0, 1.0])
         g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, [0.0, -1.0, 1.0])
 
         # Set the first grasp pose to the input pose

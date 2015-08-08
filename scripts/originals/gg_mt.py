@@ -165,8 +165,12 @@ class MoveItDemo:
         for grasp in grasps:
 #            print grasp
             self.gripper_pose_pub.publish(grasp)
-            self.plan_exec(grasp)
+#            self.plan_exec(grasp)
             rospy.sleep(0.2)
+
+        for grasp in grasps:
+            self.grasp_plan(grasp)
+
 #            # Repeat until we succeed or run out of attempts
 #            while success == False and n_attempts < max_pick_attempts:
 #                success = self.plan_exec(grasp)
@@ -196,19 +200,19 @@ class MoveItDemo:
 
     def grasp_generator(self, initial_pose):
 
-        # Pitch angles to try
-        pitch_vals = [1, 1.57 ]
-
-        # Yaw angles to try
-        yaw_vals = [0]#, 1.57, -1.57]
-        
-
         # A list to hold the grasps
         grasps = []
         g = PoseStamped()
         g.header.frame_id = REFERENCE_FRAME
         g.pose = initial_pose.pose
         g.pose.position.z += 0.18
+
+        # Pitch angles to try
+        pitch_vals = [0, 1.57 ]
+
+        # Yaw angles to try
+        yaw_vals = [0]#, 1.57, -1.57]
+
 
         # Generate a grasp for each pitch and yaw angle
         for y in yaw_vals:
@@ -241,6 +245,16 @@ class MoveItDemo:
         rospy.sleep(5)
         self.right_arm.go(wait=True)
 
+    def grasp_plan(self, pose):
+
+        self.right_arm.clear_pose_targets()
+        self.right_arm.set_pose_target(pose, GRIPPER_FRAME)
+        self.right_arm.plan()
+        if self.right_arm.plan():
+            self.right_arm.go()
+
+
+
 
     def close_gripper(self):
 
@@ -271,13 +285,14 @@ class MoveItDemo:
             table_id = 'table'
             self.tid = self.pwh.name.index('table') 
             obstacle1_id = 'obstacle1'
-            self.o1id = self.pwh.name.index('wood_block_10_2_1cm')
-
+#            self.o1id = self.pwh.name.index('wood_block_10_2_1cm')
+            self.o1id = self.pwh.name.index('coke_can')
 
             # Set the target size [l, w, h]
             target_size = [0.05, 0.05, 0.05]
             table_size = [1.5, 0.8, 0.03]
-            obstacle1_size = [0.1, 0.025, 0.01]
+#            obstacle1_size = [0.1, 0.025, 0.01]
+            obstacle1_size = [0.1, 0.05, 0.30]
 
             ## Set the target pose on the table
             target_pose = PoseStamped()
@@ -297,8 +312,9 @@ class MoveItDemo:
                 obstacle1_pose = PoseStamped()
                 obstacle1_pose.header.frame_id = REFERENCE_FRAME
                 obstacle1_pose.pose = self.pwh.pose[self.o1id]
-                # Add the target object to the scene
-                scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
+                obstacle1_pose.pose.position.z += 0.15
+                # Add the target object to the scene 
+                self.scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
 
                 ### Make the target purple ###
                 self.setColor(target_id, 0.6, 0, 1, 1.0)

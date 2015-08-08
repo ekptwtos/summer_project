@@ -14,8 +14,6 @@ from gazebo_msgs.msg import ModelStates
 from tf import transformations
 import numpy as np
 import  pr2_controllers_msgs.msg as pr2c 
-import time, threading
-
 
 GROUP_NAME_ARM = 'right_arm'
 GROUP_NAME_GRIPPER = 'right_gripper' 
@@ -23,20 +21,18 @@ GROUP_NAME_GRIPPER = 'right_gripper'
 GRIPPER_FRAME = 'r_wrist_roll_link'  # 'r_gripper_tool_frame' // 'r_wrist_roll_link'
 
 GRIPPER_OPEN = [0.088]
-GRIPPER_CLOSED = [0.03]
+GRIPPER_CLOSED = [0.035]
 GRIPPER_NEUTRAL = [0.05]
 
-GRIPPER_JOINT_NAMES = ['r_gripper_joint']
+GRIPPER_JOINT_NAMES = ['r_gripper_joint'] # 'r_gripper_motor_screw_joint' // 'r_gripper_joint'
 
-GRIPPER_EFFORT = [1.0]
+GRIPPER_EFFORT = [100.0]
 
 REFERENCE_FRAME = 'base_footprint'
 
 
 class MoveItDemo:
     def __init__(self):
-
-
         # Initialize the move_group API
         moveit_commander.roscpp_initialize(sys.argv)
 
@@ -46,7 +42,7 @@ class MoveItDemo:
         robot = moveit_commander.RobotCommander()
 
         # Use the planning scene object to add or remove objects
-        self.scene = PlanningSceneInterface()
+        scene = PlanningSceneInterface()
 
         # Create a scene publisher to push changes to the scene
         self.scene_pub = rospy.Publisher('planning_scene', PlanningScene, queue_size=10)
@@ -57,11 +53,13 @@ class MoveItDemo:
         # Create a publisher for displaying object frames
         self.object_frames_pub = rospy.Publisher('object_frames', PoseStamped, queue_size=10)
 
+        ## Create a publisher for visualizing direction ###
+        self.p_pub = rospy.Publisher('target', PoseStamped, latch=True, queue_size = 10)
+
         # Create a dictionary to hold object colors
         self.colors = dict()
 
         # Initialize the MoveIt! commander for the arm
-        global right_arm
         right_arm = MoveGroupCommander(GROUP_NAME_ARM)
 
         # Initialize the MoveIt! commander for the gripper
@@ -98,41 +96,81 @@ class MoveItDemo:
         self.idx_targ = None
         self.gazebo_subscriber = rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_state_callback)
 
-        # Prepare Gripper 
-        self.ac = actionlib.SimpleActionClient('r_gripper_controller/gripper_action',pr2c.Pr2GripperCommandAction)
-        self.ac.wait_for_server()
+        # Prepare Gripper and open it
+#        self.ac = actionlib.SimpleActionClient('r_gripper_controller/gripper_action',pr2c.Pr2GripperCommandAction)
+#        self.ac.wait_for_server()
+
+#        g_open = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.088, 100))
+#        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.0, 1))
+#        self.ac.send_goal(g_open)
 
         rospy.sleep(2)
-
-
-        ### OPEN THE GRIPPER ###
-        self.open_gripper()
-
-        self.obj_att = None
-
-
+        
         # PREPARE THE SCENE
-        while self.pwh is None:
+       	
+       	while self.pwh is None:
             rospy.sleep(0.05)
 
-        ############## CLEAR THE SCENE ################
+        target_id = 'target'
+        self.taid = self.pwh.name.index('wood_cube_5cm')
+        table_id = 'table'
+        self.tid = self.pwh.name.index('table') 
+        #obstacle1_id = 'obstacle1'
+        #self.o1id = self.pwh.name.index('wood_block_10_2_1cm')
 
         # Remove leftover objects from a previous run
-        self.scene.remove_world_object('target')
-        self.scene.remove_world_object('table')
-#        self.scene.remove_world_object(obstacle1_id)
+        scene.remove_world_object(target_id)
+        scene.remove_world_object(table_id)
+        #scene.remove_world_object(obstacle1_id)
 
         # Remove any attached objects from a previous session
-        self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
+        scene.remove_attached_object(GRIPPER_FRAME, target_id)
 
-        # Run and keep in the BG the scene generator also add the ability to kill the code with ctrl^c
-        timerThread = threading.Thread(target=self.scene_generator)
-        timerThread.daemon = True
-        timerThread.start()
+        # Set the target size [l, w, h]
+        target_size = [0.05, 0.05, 0.05]
+        table_size = [1.5, 0.8, 0.03]
+        #obstacle1_size = [0.1, 0.025, 0.01]
 
+        ## Set the target pose on the table
+        target_pose = PoseStamped()
+        target_pose.header.frame_id = REFERENCE_FRAME
+        target_pose.pose = self.pwh.pose[self.taid]
+        target_pose.pose.position.z += 0.025
+        # Add the target object to the scene
+        scene.add_box(target_id, target_pose, target_size)
 
+        table_pose = PoseStamped()
+        table_pose.header.frame_id = REFERENCE_FRAME
+        table_pose.pose = self.pwh.pose[self.tid]
+        table_pose.pose.position.z += 1
+        scene.add_box(table_id, table_pose, table_size)
+        
+        #obstacle1_pose = PoseStamped()
+        #obstacle1_pose.header.frame_id = REFERENCE_FRAME
+        #obstacle1_pose.pose = self.pwh.pose[self.o1id]
+        ## Add the target object to the scene
+        #scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
 
-        print "==================== Generating Transformations ========================="
+        # Specify a pose to place the target after being picked up
+        place_pose = PoseStamped()
+        place_pose.header.frame_id = REFERENCE_FRAME
+        place_pose.pose.position.x = 0.50
+        place_pose.pose.position.y = -0.30
+        place_pose.pose.orientation.w = 1.0
+
+        # Add the target object to the scene
+        scene.add_box(target_id, target_pose, target_size)
+                
+        ### Make the target purple ###
+        self.setColor(target_id, 0.6, 0, 1, 1.0)
+
+        # Send the colors to the planning scene
+        self.sendColors()
+        
+        #print target_pose
+        self.object_frames_pub.publish(target_pose)
+        rospy.sleep(2)
+
 
         #################### PRE GRASPING POSE #########################
         M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
@@ -143,51 +181,44 @@ class MoveItDemo:
         M2 = transformations.euler_matrix(0, 1.57, 0)
         M2[0,3] = 0.0  # offset about x
         M2[1,3] = 0.0   # about y
-        M2[2,3] = 0.25  # about z
+        M2[2,3] = 0.0  # about z
 
         T = np.dot(M1,  M2)
-        pre_grasping = deepcopy(target_pose)
-        pre_grasping.pose.position.x = T[0,3] 
-        pre_grasping.pose.position.y = T[1,3]
-        pre_grasping.pose.position.z = T[2,3]
+        init_pose = deepcopy(target_pose)
+        init_pose.pose.position.x = T[0,3] 
+        init_pose.pose.position.y = T[1,3]
+        init_pose.pose.position.z = T[2,3]
 
         quat = transformations.quaternion_from_matrix(T)
-        pre_grasping.pose.orientation.x = quat[0]
-        pre_grasping.pose.orientation.y = quat[1]
-        pre_grasping.pose.orientation.z = quat[2]
-        pre_grasping.pose.orientation.w = quat[3]
-        pre_grasping.header.frame_id = 'gazebo_world'
-        self.plan_exec(pre_grasping)
+        init_pose.pose.orientation.x = quat[0]
+        init_pose.pose.orientation.y = quat[1]
+        init_pose.pose.orientation.z = quat[2]
+        init_pose.pose.orientation.w = quat[3]
+#        init_pose.header.frame_id = 'gazebo_world'
 
-
-
-
-
-        #print target_pose
-        #self.object_frames_pub.publish(target_pose)
-        rospy.sleep(2)
+        self.p_pub.publish(init_pose)
 
         # Initialize the grasp pose to the target pose
-        grasp_pose = target_pose
-        grasp_pose.header.frame_id = 'gazebo_world'
+        grasp_pose = init_pose
+        #grasp_pose.header.frame_id = 'gazebo_wolrd'
 
         # Shift the grasp pose by half the width of the target to center it
 
-        grasp_pose.pose.position.y -= target_size[1] / 2.0
-        #grasp_pose.pose.position.x = target_pose.pose.position.x / 2.0
+#        grasp_pose.pose.position.y -= target_size[1] / 2.0
+#        grasp_pose.pose.position.x = target_pose.pose.position.x / 2.0
 #        grasp_pose.pose.position.x = target_pose.pose.position.x -0.07
-#        grasp_pose.pose.position.z = target_pose.pose.position.z +0.025
+#        grasp_pose.pose.position.z = target_pose.pose.position.z +0.1
 
         #Allowed touch object list
-#        ato = []
-#        ato.append(target_id)
-#        ato.append('r_forearm_link')
+#        ato = [target_id, 'r_forearm_link']
+
 
 
         # Generate a list of grasps
-        grasps = self.make_grasps(grasp_pose, [target_id]) #### [target_id] , ato
+        grasps = self.make_grasps(grasp_pose, [target_id]) #### [target_id]
         # Publish the grasp poses so they can be viewed in RViz
         for grasp in grasps:
+#            print grasp.grasp_pose
             self.gripper_pose_pub.publish(grasp.grasp_pose)
             rospy.sleep(0.2)
 
@@ -195,12 +226,16 @@ class MoveItDemo:
         success = False
         n_attempts = 0
 
+        #Allowed touch link list
+        atl = ['r_forearm_link']
+
         # Repeat until we succeed or run out of attempts
         while success == False and n_attempts < max_pick_attempts:
             success = right_arm.pick(target_id, grasps)
             n_attempts += 1
             rospy.loginfo("Pick attempt: " +  str(n_attempts))
             rospy.sleep(0.2)
+
 
 
 
@@ -236,49 +271,23 @@ class MoveItDemo:
         #right_gripper.go()
 
         #rospy.sleep(1)
-
-        #rospy.spin()
-
-
+	
+	#rospy.spin()
+	
+	
         # Shut down MoveIt cleanly
         moveit_commander.roscpp_shutdown()
 
         # Exit the script
         moveit_commander.os._exit(0)
 
-
-############################################################### FUNCTIONS ################################################################
-
-
-
+    
+    #Get pose from Gazebo
     def model_state_callback(self,msg):
 
         self.pwh = ModelStates()
         self.pwh = msg
 
-    def plan_exec(self, pose):
-
-        right_arm.clear_pose_targets()
-        right_arm.set_pose_target(pose, GRIPPER_FRAME)
-        right_arm.plan()
-        rospy.sleep(5)
-        right_arm.go(wait=True)
-
-
-    def close_gripper(self):
-
-        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.035, 100))
-        self.ac.send_goal(g_close)
-        self.ac.wait_for_result()
-        rospy.sleep(15) # Gazebo requires up to 15 seconds to attach object
-
-
-    def open_gripper(self):
-
-        g_open = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.088, 100))
-        self.ac.send_goal(g_open)
-        self.ac.wait_for_result()
-        rospy.sleep(5) # And up to 20 to detach it
 
     # Get the gripper posture as a JointTrajectory
     def make_gripper_posture(self, joint_positions):
@@ -334,7 +343,7 @@ class MoveItDemo:
         g.grasp_posture = self.make_gripper_posture(GRIPPER_CLOSED)
 
         # Set the approach and retreat parameters as desired
-        g.pre_grasp_approach = self.make_gripper_translation(0.18, 0.1, [1.0, 0.0, 0.0])
+        g.pre_grasp_approach = self.make_gripper_translation(0.05, 0.1, [1.0, 0.0, 0.0])
         g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, [0.0, -1.0, 1.0])
 
         # Set the first grasp pose to the input pose
@@ -428,64 +437,6 @@ class MoveItDemo:
 
         ## Return the list
         #return places
-
-
-    def scene_generator(self):
-#        print obj_att
-        global target_pose
-        global target_id
-        global target_size
-
-        next_call = time.time()
-        while True:
-            next_call = next_call+1
-            target_id = 'target'
-            self.taid = self.pwh.name.index('wood_cube_5cm')
-            table_id = 'table'
-            self.tid = self.pwh.name.index('table') 
-#            obstacle1_id = 'obstacle1'
-#            self.o1id = self.pwh.name.index('wood_block_10_2_1cm')
-
-
-            # Set the target size [l, w, h]
-            target_size = [0.05, 0.05, 0.05]
-            table_size = [1.5, 0.8, 0.03]
-#            obstacle1_size = [0.1, 0.025, 0.01]
-
-            ## Set the target pose on the table
-            target_pose = PoseStamped()
-            target_pose.header.frame_id = REFERENCE_FRAME
-            target_pose.pose = self.pwh.pose[self.taid]
-            target_pose.pose.position.z += 0.025
-            if self.obj_att is None:
-                # Add the target object to the scene
-                self.scene.add_box(target_id, target_pose, target_size)
-
-                table_pose = PoseStamped()
-                table_pose.header.frame_id = REFERENCE_FRAME
-                table_pose.pose = self.pwh.pose[self.tid]
-                table_pose.pose.position.z += 1
-                self.scene.add_box(table_id, table_pose, table_size)
-                
-#                obstacle1_pose = PoseStamped()
-#                obstacle1_pose.header.frame_id = REFERENCE_FRAME
-#                obstacle1_pose.pose = self.pwh.pose[self.o1id]
-#                # Add the target object to the scene
-#                self.scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
-
-                ### Make the target purple ###
-                self.setColor(target_id, 0.6, 0, 1, 1.0)
-
-                # Send the colors to the planning scene
-                self.sendColors()
-            else: 
-                self.scene.remove_world_object('target')
-
-            time.sleep(next_call - time.time())
-        #threading.Timer(0.5, self.scene_generator).start()
-
-
-
 
     # Set the color of an object
     def setColor(self, name, r, g, b, a = 0.9):
