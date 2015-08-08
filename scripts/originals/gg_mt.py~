@@ -208,7 +208,7 @@ class MoveItDemo:
         g.pose.position.z += 0.18
 
         # Pitch angles to try
-        pitch_vals = [0, 1.57 ]
+        pitch_vals = [0, 1.57 , -1,57 ]
 
         # Yaw angles to try
         yaw_vals = [0]#, 1.57, -1.57]
