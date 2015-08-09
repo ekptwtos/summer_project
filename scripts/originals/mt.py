@@ -186,7 +186,7 @@ class MoveItDemo:
         #################### ATTACH OBJECT ######################
 
         touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link']
-        print touch_links
+        #print touch_links
         self.scene.attach_box(GRIPPER_FRAME, target_id, target_pose, target_size, touch_links)
 
         # counter to let the planning scene know when to remove the object
@@ -220,10 +220,42 @@ class MoveItDemo:
         post_grasping.header.frame_id = 'gazebo_world'
 
         self.plan_exec(post_grasping)
-        self.open_gripper()
 
+
+
+
+        # Specify a pose to place the target after being picked up
+        place_pose = PoseStamped()
+        place_pose.header.frame_id = REFERENCE_FRAME
+        place_pose.pose.position.x = 0.52
+        place_pose.pose.position.y = -0.48
+        place_pose.pose.position.z = 0.48
+        place_pose.pose.orientation.w = 1.0
+
+
+        n_attempts = 0
+        max_place_attempts = 2
+        # Generate valid place poses
+        places = self.make_places(place_pose)
+
+        success = False
+        # Repeat until we succeed or run out of attempts
+        while success == False and n_attempts < max_place_attempts:
+            for place in places:
+                success = self.right_arm.place(target_id, place)
+                if success:
+                    break
+            n_attempts += 1
+            rospy.loginfo("Place attempt: " +  str(n_attempts))
+            rospy.sleep(0.2)
+
+
+        self.open_gripper()
         obj_att = None
         rospy.sleep(3)
+
+
+
 ##        # Initialize the grasp object
 ##        g = Grasp()
 ##        grasps = []
@@ -245,11 +277,61 @@ class MoveItDemo:
 #        # Exit the script
         moveit_commander.os._exit(0)
 
+##################################################################################################################
+
     #Get pose from Gazebo
     def model_state_callback(self,msg):
 
         self.pwh = ModelStates()
         self.pwh = msg
+
+    # Generate a list of possible place poses
+    def make_places(self, init_pose):
+        # Initialize the place location as a PoseStamped message
+        place = PoseStamped()
+
+        # Start with the input place pose
+        place = init_pose
+
+        # A list of x shifts (meters) to try
+        x_vals = [0, 0.005, 0.01, 0.015, -0.005, -0.01, -0.015]
+
+        # A list of y shifts (meters) to try
+        y_vals = [0, 0.005, 0.01, 0.015, -0.005, -0.01, -0.015]       
+
+        # A list of pitch angles to try
+        #pitch_vals = [0, 0.005, -0.005, 0.01, -0.01, 0.02, -0.02]
+
+        pitch_vals = [0]
+
+        # A list of yaw angles to try
+        yaw_vals = [0]
+
+        # A list to hold the places
+        places = []
+
+        # Generate a place pose for each angle and translation
+        for y in yaw_vals:
+            for p in pitch_vals:
+                for y in y_vals:
+                    for x in x_vals:
+                        place.pose.position.x = init_pose.pose.position.x + x
+                        place.pose.position.y = init_pose.pose.position.y + y
+
+                        # Create a quaternion from the Euler angles
+                        q = quaternion_from_euler(0, p, y)
+
+                        # Set the place pose orientation accordingly
+                        place.pose.orientation.x = q[0]
+                        place.pose.orientation.y = q[1]
+                        place.pose.orientation.z = q[2]
+                        place.pose.orientation.w = q[3]
+
+                        # Append this place pose to the list
+                        places.append(deepcopy(place))
+
+        # Return the list
+        return places
 
 
     def plan_exec(self, pose):

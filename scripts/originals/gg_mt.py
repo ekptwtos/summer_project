@@ -5,7 +5,8 @@ import actionlib
 import moveit_commander
 from geometry_msgs.msg import PoseStamped, Pose
 from moveit_commander import MoveGroupCommander, PlanningSceneInterface
-from moveit_msgs.msg import PlanningScene, ObjectColor , AttachedCollisionObject
+from moveit_msgs.srv import GetMotionPlan
+from moveit_msgs.msg import PlanningScene, ObjectColor , AttachedCollisionObject , MoveItErrorCodes ,MotionPlanRequest
 from moveit_msgs.msg import Grasp, GripperTranslation
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from tf.transformations import quaternion_from_euler
@@ -89,6 +90,8 @@ class MoveItDemo:
         self.idx_targ = None
         self.gazebo_subscriber = rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_state_callback)
 
+#        self.m_error = rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_state_callback)
+
 
         ### OPEN THE GRIPPER ###
         self.open_gripper()
@@ -148,7 +151,29 @@ class MoveItDemo:
         pre_grasping.pose.orientation.z = quat[2]
         pre_grasping.pose.orientation.w = quat[3]
         pre_grasping.header.frame_id = 'gazebo_world'
+
+
+
+
         self.plan_exec(pre_grasping)
+
+
+
+#        plan = MotionPlanRequest()
+#        plan.goal_constraints = pre_grasping
+#        plan.num_planning_attempts = 2
+#        plan.allowed_planning_time = 3
+#        plan.group_name ='right_arm'
+#        print plan
+#        self.right_arm.execute(plan)
+
+
+#        print GetMotionPlan
+#        mp = GetMotionPlan.motion_plan_response
+#        print mp
+
+
+
 
 
         ################# GENERATE GRASPS ###################
@@ -169,6 +194,7 @@ class MoveItDemo:
             rospy.sleep(0.2)
 
         for grasp in grasps:
+            #print self.grasp_plan(grasp)
             self.grasp_plan(grasp)
 
 #            # Repeat until we succeed or run out of attempts
@@ -208,7 +234,7 @@ class MoveItDemo:
         g.pose.position.z += 0.18
 
         # Pitch angles to try
-        pitch_vals = [0, 1.57 , -1,57 ]
+        pitch_vals = [0, 1.57, -1.57 , 0]
 
         # Yaw angles to try
         yaw_vals = [0]#, 1.57, -1.57]
@@ -246,12 +272,20 @@ class MoveItDemo:
         self.right_arm.go(wait=True)
 
     def grasp_plan(self, pose):
-
+        bk = 0
         self.right_arm.clear_pose_targets()
         self.right_arm.set_pose_target(pose, GRIPPER_FRAME)
         self.right_arm.plan()
-        if self.right_arm.plan():
-            self.right_arm.go()
+#        print MoveItErrorCodes()
+#        if self.right_arm.plan():
+        self.right_arm.go()
+        while self.right_arm.go() is True:
+            print self.right_arm.go()
+            rospy.sleep(5)
+            bk = 1
+            break
+        if bk is 1:
+            return
 
 
 

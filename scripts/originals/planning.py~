@@ -170,14 +170,14 @@ class MoveItDemo:
 
         # Initialize the grasp pose to the target pose
         grasp_pose = target_pose
-        grasp_pose.header.frame_id = 'gazebo_wolrd'
+        #grasp_pose.header.frame_id = 'gazebo_wolrd'
 
         # Shift the grasp pose by half the width of the target to center it
 
-        grasp_pose.pose.position.y -= target_size[1] / 2.0
+#        grasp_pose.pose.position.y -= target_size[1] / 2.0
 #        grasp_pose.pose.position.x = target_pose.pose.position.x / 2.0
 #        grasp_pose.pose.position.x = target_pose.pose.position.x -0.07
-#        grasp_pose.pose.position.z = target_pose.pose.position.z +0.1
+#        grasp_pose.pose.position.z += 0.18
 
         #Allowed touch object list
 #        ato = [target_id, 'r_forearm_link']
@@ -310,13 +310,13 @@ class MoveItDemo:
         # Initialize the grasp object
         g = Grasp()
 
-        # Set the pre-grasp and grasp postures appropriately
-        g.pre_grasp_posture = self.make_gripper_posture(GRIPPER_OPEN)
-        g.grasp_posture = self.make_gripper_posture(GRIPPER_CLOSED)
+#        # Set the pre-grasp and grasp postures appropriately
+#        g.pre_grasp_posture = self.make_gripper_posture(GRIPPER_OPEN)
+#        g.grasp_posture = self.make_gripper_posture(GRIPPER_CLOSED)
 
-        # Set the approach and retreat parameters as desired
-        g.pre_grasp_approach = self.make_gripper_translation(0.18, 0.1, [1.0, 0.0, 0.0])
-        g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, [0.0, -1.0, 1.0])
+#        # Set the approach and retreat parameters as desired
+#        g.pre_grasp_approach = self.make_gripper_translation(0.18, 0.1, [0.0, 0.0, 1.0])
+#        g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, [0.0, -1.0, 1.0])
 
         # Set the first grasp pose to the input pose
         g.grasp_pose = initial_pose_stamped
