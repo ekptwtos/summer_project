@@ -195,18 +195,24 @@ class MoveItDemo:
 
 
         for grasp in grasps:
-            #print self.grasp_plan(grasp)
-#            self.grasp_plan(grasp)
-            print grasp
-            while success == False and n_attempts < max_pick_attempts:
-                success = self.right_arm.plan(grasp)
-                n_attempts += 1
-                rospy.loginfo("Pick attempt: " +  str(n_attempts))
-                rospy.sleep(0.2)
-            if success:
-#                grasp_idx = grasp.
-                self.right_arm.go(grasp)
+            if self.right_arm.go(grasp) == True:
+                print "executing grasp"
+                #self.right_arm.go(grasp)
+                break
+            else:
+                print "No valid grasp"
 
+
+
+#            while success == False:# and n_attempts < max_pick_attempts:
+#                success = self.right_arm.plan(grasp)
+#                n_attempts += 1
+#                rospy.loginfo("Pick attempt: " +  str(n_attempts))
+#                rospy.sleep(0.2)
+#            if success:
+##                grasp_idx = grasp.
+#                self.right_arm.go(grasp)
+#                print self.right_arm.go(grasp)
 
 
 #            # Repeat until we succeed or run out of attempts
@@ -246,10 +252,10 @@ class MoveItDemo:
         g.pose.position.z += 0.18
 
         # Pitch angles to try
-        pitch_vals = [0, 1.57]
+        pitch_vals = [0,1, 1.57]
 
         # Yaw angles to try
-        yaw_vals = [0]#, 1.57, -1.57]
+        yaw_vals = [0, 1.57]#, 1.57, -1.57]
 
 
         # Generate a grasp for each pitch and yaw angle
@@ -338,7 +344,7 @@ class MoveItDemo:
             target_size = [0.05, 0.05, 0.05]
             table_size = [1.5, 0.8, 0.03]
 #            obstacle1_size = [0.1, 0.025, 0.01]
-            obstacle1_size = [0.1, 0.05, 0.30]
+            obstacle1_size = [0.15, 0.15, 0.30]
 
             ## Set the target pose on the table
             target_pose = PoseStamped()
