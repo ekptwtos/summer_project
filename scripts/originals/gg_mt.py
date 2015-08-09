@@ -183,7 +183,7 @@ class MoveItDemo:
         # Track success/failure and number of attempts for pick operation
         success = False
         n_attempts = 0
-
+        grasp_idx = None
         grasps = self.grasp_generator(initial_pose)
 
 
@@ -193,9 +193,21 @@ class MoveItDemo:
 #            self.plan_exec(grasp)
             rospy.sleep(0.2)
 
+
         for grasp in grasps:
             #print self.grasp_plan(grasp)
-            self.grasp_plan(grasp)
+#            self.grasp_plan(grasp)
+            print grasp
+            while success == False and n_attempts < max_pick_attempts:
+                success = self.right_arm.plan(grasp)
+                n_attempts += 1
+                rospy.loginfo("Pick attempt: " +  str(n_attempts))
+                rospy.sleep(0.2)
+            if success:
+#                grasp_idx = grasp.
+                self.right_arm.go(grasp)
+
+
 
 #            # Repeat until we succeed or run out of attempts
 #            while success == False and n_attempts < max_pick_attempts:
@@ -234,7 +246,7 @@ class MoveItDemo:
         g.pose.position.z += 0.18
 
         # Pitch angles to try
-        pitch_vals = [0, 1.57, -1.57 , 0]
+        pitch_vals = [0, 1.57]
 
         # Yaw angles to try
         yaw_vals = [0]#, 1.57, -1.57]
@@ -279,13 +291,13 @@ class MoveItDemo:
 #        print MoveItErrorCodes()
 #        if self.right_arm.plan():
         self.right_arm.go()
-        while self.right_arm.go() is True:
-            print self.right_arm.go()
-            rospy.sleep(5)
-            bk = 1
-            break
-        if bk is 1:
-            return
+#        while self.right_arm.go() is True:
+#            print self.right_arm.go()
+#            rospy.sleep(5)
+#            bk = 1
+#            break
+#        if bk is 1:
+#            return
 
 
 
