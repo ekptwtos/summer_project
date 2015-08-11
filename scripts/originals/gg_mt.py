@@ -123,7 +123,7 @@ class MoveItDemo:
 
 
         initial_pose = target_pose
-        initial_pose.header.frame_id = 'gazebo_world'
+#        initial_pose.header.frame_id = 'gazebo_world'
 
 
         print "==================== Generating Transformations ==========================="
@@ -139,18 +139,18 @@ class MoveItDemo:
         M2[1,3] = 0.0   # about y
         M2[2,3] = 0.25  # about z
 
-        T = np.dot(M1,  M2)
+        T1 = np.dot(M1,  M2)
         pre_grasping = deepcopy(target_pose)
-        pre_grasping.pose.position.x = T[0,3] 
-        pre_grasping.pose.position.y = T[1,3]
-        pre_grasping.pose.position.z = T[2,3]
+        pre_grasping.pose.position.x = T1[0,3] 
+        pre_grasping.pose.position.y = T1[1,3]
+        pre_grasping.pose.position.z = T1[2,3]
 
-        quat = transformations.quaternion_from_matrix(T)
+        quat = transformations.quaternion_from_matrix(T1)
         pre_grasping.pose.orientation.x = quat[0]
         pre_grasping.pose.orientation.y = quat[1]
         pre_grasping.pose.orientation.z = quat[2]
         pre_grasping.pose.orientation.w = quat[3]
-        pre_grasping.header.frame_id = 'gazebo_world'
+        pre_grasping.header.frame_id = REFERENCE_FRAME ##'gazebo_world'
 
 
 
@@ -190,37 +190,19 @@ class MoveItDemo:
         for grasp in grasps:
 #            print grasp
             self.gripper_pose_pub.publish(grasp)
-#            self.plan_exec(grasp)
             rospy.sleep(0.2)
 
 
         for grasp in grasps:
-            if self.right_arm.go(grasp) == True:
-                print "executing grasp"
-                #self.right_arm.go(grasp)
-                break
-            else:
-                print "No valid grasp"
-
-
-
-#            while success == False:# and n_attempts < max_pick_attempts:
-#                success = self.right_arm.plan(grasp)
-#                n_attempts += 1
-#                rospy.loginfo("Pick attempt: " +  str(n_attempts))
-#                rospy.sleep(0.2)
-#            if success:
-##                grasp_idx = grasp.
+            pl = self.right_arm.plan(grasp)
+            print len(pl.joint_trajectory.points)
+            if len(pl.joint_trajectory.points) >=10:  #!= 0: ## FAILED PLANS HAVE LEN = 0 
 #                self.right_arm.go(grasp)
-#                print self.right_arm.go(grasp)
-
-
-#            # Repeat until we succeed or run out of attempts
-#            while success == False and n_attempts < max_pick_attempts:
-#                success = self.plan_exec(grasp)
-#                n_attempts += 1
-#                rospy.loginfo("Pick attempt: " +  str(n_attempts))
-#                rospy.sleep(0.2)
+                if self.right_arm.go(grasp) == True:
+                    print "executing grasp"
+                    self.right_arm.go(grasp)
+                    break
+                    
 
 
 
@@ -246,38 +228,79 @@ class MoveItDemo:
 
         # A list to hold the grasps
         grasps = []
+
+        # Original Pose of the object
+        o = PoseStamped()
+        o.header.frame_id = REFERENCE_FRAME
+        o.pose = initial_pose.pose
+#        o.pose.position.z += 0.18
+
+        # Pose for the grasps to be generated
         g = PoseStamped()
         g.header.frame_id = REFERENCE_FRAME
         g.pose = initial_pose.pose
-        g.pose.position.z += 0.18
 
         # Pitch angles to try
-        pitch_vals = [0,1, 1.57]
+        pitch_vals = [0, 1.57]
 
         # Yaw angles to try
         yaw_vals = [0, 1.57]#, 1.57, -1.57]
 
+        # Roll angles to try
+        roll_vals = [0]
+
+
+        z_vals = [0.05 , 0.1 , 0.15 , 0.18]
+        x_vals = [0.05 , 0.1 , 0.15 , 0.18]
 
         # Generate a grasp for each pitch and yaw angle
-        for y in yaw_vals:
-            for p in pitch_vals:
-                # Create a quaternion from the Euler angles
-                q = transformations.quaternion_from_euler(0, p, y)
+        for r in roll_vals:
+            for y in yaw_vals:
+                for p in self.drange(0, 3.14 , 0.2):
+                    
+                    ####### Ensure that the gripper follows the object frame
+                    G = transformations.euler_matrix(r, p, y)
+                    G[0,3] = 0.0  # offset about x
+                    G[1,3] = 0.0   # about y
+                    G[2,3] = 0.0  # about z
 
-                # Set the grasp pose orientation accordingly
-                g.pose.orientation.x = q[0]
-                g.pose.orientation.y = q[1]
-                g.pose.orientation.z = q[2]
-                g.pose.orientation.w = q[3]
+                    O = transformations.quaternion_matrix([o.pose.orientation.x, o.pose.orientation.y, o.pose.orientation.z, o.pose.orientation.w])
+                    O[0,3] = o.pose.position.x
+                    O[1,3] = o.pose.position.y 
+                    O[2,3] = o.pose.position.z
+    #                if 0.785 <= p <= 2.335:
+    #                elif -0.785 <=  p <= 0.784:
+    #                    T = np.dot(O, G)
+    #                    grasp = deepcopy(o)
+    #                    grasp.pose.position.x = T[0,3] - 0.18
+    #                    grasp.pose.position.y = T[1,3]
+    #                    grasp.pose.position.z = T[2,3] 
+
+                    T = np.dot(O, G)
+                    grasp = deepcopy(o)
+                    grasp.pose.position.x = T[0,3] #-x
+                    grasp.pose.position.y = T[1,3]
+                    grasp.pose.position.z = T[2,3] #+z
+
+                    quat = transformations.quaternion_from_matrix(T)
+                    grasp.pose.orientation.x = quat[0]
+                    grasp.pose.orientation.y = quat[1]
+                    grasp.pose.orientation.z = quat[2]
+                    grasp.pose.orientation.w = quat[3]
+                    grasp.header.frame_id = REFERENCE_FRAME
 
 
-                # Append the grasp to the list
-                grasps.append(deepcopy(g))
-     
+                    # Append the grasp to the list
+                    grasps.append(deepcopy(grasp))
+
         # Return the list
         return grasps
 
-
+    def drange(self, start, stop, step):
+        r = start
+        while r < stop:
+            yield r
+            r += step
 
 
 
@@ -290,20 +313,12 @@ class MoveItDemo:
         self.right_arm.go(wait=True)
 
     def grasp_plan(self, pose):
-        bk = 0
+
         self.right_arm.clear_pose_targets()
         self.right_arm.set_pose_target(pose, GRIPPER_FRAME)
         self.right_arm.plan()
-#        print MoveItErrorCodes()
-#        if self.right_arm.plan():
         self.right_arm.go()
-#        while self.right_arm.go() is True:
-#            print self.right_arm.go()
-#            rospy.sleep(5)
-#            bk = 1
-#            break
-#        if bk is 1:
-#            return
+
 
 
 
