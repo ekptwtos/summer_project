@@ -264,9 +264,9 @@
       <pose>1 -1 0 0 -0 0</pose>
     </model>
     <state world_name='default'>
-      <sim_time>735 705000000</sim_time>
-      <real_time>55 505439244</real_time>
-      <wall_time>1439489269 513934775</wall_time>
+      <sim_time>719 954000000</sim_time>
+      <real_time>39 665573940</real_time>
+      <wall_time>1439489253 674069310</wall_time>
       <model name='custom_0'>
         <pose>0.570091 -0.414303 0.530496 0.028986 -2e-06 0.006559</pose>
         <link name='link'>

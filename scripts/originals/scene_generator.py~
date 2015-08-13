@@ -17,7 +17,6 @@ import numpy as np
 import  pr2_controllers_msgs.msg as pr2c 
 import time, threading
 from shape_msgs.msg import SolidPrimitive
-from summer_project.msg import CGrasp as cgrasp
 
 
 
@@ -124,43 +123,55 @@ class MoveItDemo:
         timerThread.start()
 
 
+        initial_pose = target_pose
+#        initial_pose.header.frame_id = 'gazebo_world'
+
 
         print "==================== Generating Transformations ==========================="
 
-        #################### PRE GRASPING POSES #########################
+        #################### PRE GRASPING POSE #########################
+        M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
+        M1[0,3] = target_pose.pose.position.x
+        M1[1,3] = target_pose.pose.position.y 
+        M1[2,3] = target_pose.pose.position.z
 
-        init_poses = []
-        init_pose_x = self.pg(target_pose, 0)
-        init_poses.append(init_pose_x) 
-        init_pose_yl = self.pg(target_pose, 1)
-        init_poses.append(init_pose_yl)  
-        init_pose_yr = self.pg(target_pose, 2) 
-        init_poses.append(init_pose_yr) 
-        init_pose_zx = self.pg(target_pose, 3) 
-        init_poses.append(init_pose_zx) 
-        init_pose_zy = self.pg(target_pose, 4) 
-        init_poses.append(init_pose_zy) 
+        M2 = transformations.euler_matrix(0, 0, 0)
+        M2[0,3] = -0.25  # offset about x
+        M2[1,3] = 0.0   # about y
+        M2[2,3] = 0.0 # about z
 
-        ################################## TESTING AREA #####################################
+        T1 = np.dot(M1,  M2)
+        pre_grasping = deepcopy(target_pose)
+        pre_grasping.pose.position.x = T1[0,3] 
+        pre_grasping.pose.position.y = T1[1,3]
+        pre_grasping.pose.position.z = T1[2,3]
 
-#        test =[]
-#        print cgrasp.id
-#        for i in range(0,2):
-#            cgrasp.grasp_pose = init_poses[i]
-#            cgrasp.id = "x"
-#            test.append(cgrasp)
-#        print (test[0].id, test[0].grasp_pose)
-#        print (test[1].id, test[1].grasp_pose)
+        quat = transformations.quaternion_from_matrix(T1)
+        pre_grasping.pose.orientation.x = quat[0]
+        pre_grasping.pose.orientation.y = quat[1]
+        pre_grasping.pose.orientation.z = quat[2]
+        pre_grasping.pose.orientation.w = quat[3]
+        pre_grasping.header.frame_id = REFERENCE_FRAME ##'gazebo_world'
+        self.plan_exec(pre_grasping)
+
+#        self.right_arm.set_pose_target(pre_grasping, GRIPPER_FRAME)
+#        self.right_arm.plan()
+#        self.right_arm.go()
+#        self.right_arm.shift_pose_target(2, -0.085, GRIPPER_FRAME)# add value to the corresponding axis (0..5: X, Y, Z, R, P, Y) 
+#        self.right_arm.plan()
+#        self.right_arm.go()
+
+
 
 
         ################# GENERATE GRASPS ###################
 
 
-        grasps = self.grasp_generator(init_poses)
+        grasps = self.grasp_generator(initial_pose)
 
 
         for grasp in grasps:
-            print grasp
+#            print grasp
             self.gripper_pose_pub.publish(grasp)
             rospy.sleep(0.2)
 
@@ -170,9 +181,7 @@ class MoveItDemo:
             pl = self.right_arm.plan(grasp)
             print len(pl.joint_trajectory.points)
             if len(pl.joint_trajectory.points) >=10:  #!= 0: ## FAILED PLANS HAVE LEN = 0 
-#                self.right_arm.clear_pose_target(GRIPPER_FRAME)
-#                self.right_arm.set_pose_target(grasp)
-#                self.right_arm.shift_pose_target(0, 0.07, GRIPPER_FRAME)
+#                self.right_arm.go(grasp)
                 if self.right_arm.go(grasp) == True:
                     print "executing grasp"
                     self.right_arm.go(grasp)
@@ -198,114 +207,58 @@ class MoveItDemo:
         self.pwh = ModelStates()
         self.pwh = msg
 
-    def pg(self, target_pose, axis):
 
-        ############ TODO : GENERATE AUTOMATED PRE-GRASPING POSITIONS BASED ON THE PRIMITIVE #########
-
-        if axis == 0:
-            M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
-            M1[0,3] = target_pose.pose.position.x
-            M1[1,3] = target_pose.pose.position.y 
-            M1[2,3] = target_pose.pose.position.z
-
-            M2 = transformations.euler_matrix(0, 0, 0)
-            M2[0,3] = -0.25  # offset about x
-            M2[1,3] = 0.0   # about y
-            M2[2,3] = 0.0 # about z
-
-
-        elif axis == 1:
-            M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
-            M1[0,3] = target_pose.pose.position.x
-            M1[1,3] = target_pose.pose.position.y 
-            M1[2,3] = target_pose.pose.position.z
-
-            M2 = transformations.euler_matrix(0, 0, 1.57)
-            M2[0,3] = 0.0  # offset about x
-            M2[1,3] = -0.25  # about y
-            M2[2,3] = 0.0 # about z
-        elif axis ==2:
-            M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
-            M1[0,3] = target_pose.pose.position.x
-            M1[1,3] = target_pose.pose.position.y 
-            M1[2,3] = target_pose.pose.position.z
-
-            M2 = transformations.euler_matrix(0, 0, -1.57)
-            M2[0,3] = 0.0  # offset about x
-            M2[1,3] = 0.25  # about y
-            M2[2,3] = 0.0 # about z
-
-        elif axis ==3:
-            M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
-            M1[0,3] = target_pose.pose.position.x
-            M1[1,3] = target_pose.pose.position.y 
-            M1[2,3] = target_pose.pose.position.z
-
-            M2 = transformations.euler_matrix(0, 1.57, 0)
-            M2[0,3] = 0.0  # offset about x
-            M2[1,3] = 0.0  # about y
-            M2[2,3] = 0.30 # about z
-        else:
-            M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
-            M1[0,3] = target_pose.pose.position.x
-            M1[1,3] = target_pose.pose.position.y 
-            M1[2,3] = target_pose.pose.position.z
-
-            M2 = transformations.euler_matrix(1.57, 1.57, 0)
-            M2[0,3] = 0.0  # offset about x
-            M2[1,3] = 0.0  # about y
-            M2[2,3] = 0.30 # about z
-
-        T1 = np.dot(M1,  M2)
-        pg = deepcopy(target_pose)
-        pg.pose.position.x = T1[0,3] 
-        pg.pose.position.y = T1[1,3]
-        pg.pose.position.z = T1[2,3]
-
-        quat = transformations.quaternion_from_matrix(T1)
-        pg.pose.orientation.x = quat[0]
-        pg.pose.orientation.y = quat[1]
-        pg.pose.orientation.z = quat[2]
-        pg.pose.orientation.w = quat[3]
-        pg.header.frame_id = REFERENCE_FRAME ##'gazebo_world'
-
-        return pg
-
-    def grasp_generator(self, initial_poses):
+    def grasp_generator(self, initial_pose):
 
         # A list to hold the grasps
         grasps = []
-        o = []        # Original Pose of the object (o)
-        O=[]
+
+        # Original Pose of the object
+        o = PoseStamped()
+        o.header.frame_id = REFERENCE_FRAME
+        o.pose = initial_pose.pose
+#        o.pose.position.z += 0.18
+
+        # Pose for the grasps to be generated
+        g = PoseStamped()
+        g.header.frame_id = REFERENCE_FRAME
+        g.pose = initial_pose.pose
+
+        # Pitch angles to try
+        pitch_vals = [0, 1.57]
+
+        # Yaw angles to try
+        yaw_vals = [0]
+
+        # Roll angles to try
+        roll_vals = [0, 1.57]
 
 
-        i= 0
-        while i < len(initial_poses):
-            o.append(initial_poses[i])
-            i+=1
+        z_vals = [0.05 , 0.1 , 0.15 , 0.18]
+        x_vals = [0.05 , 0.1 , 0.15 , 0.18]
 
-        G = transformations.euler_matrix(0, 0, 0)
+        # Generate a grasp for each pitch and yaw angle
+        for z in self.drange(-target_size[2], target_size[2], 0.02):
+            print z
+            for y in yaw_vals:
+                for p in pitch_vals:
+#            for y in self.drange(-1.57, 1.57 , 0.2):
+#                for p in self.drange(0, 3.14 , 0.2):
+                    ####### Ensure that the gripper follows the object frame
+                    G = transformations.euler_matrix(0, p, y)
+                    G[0,3] = 0.0  # offset about x
+                    G[1,3] = 0.0   # about y
+                    G[2,3] = 0.0  # about z
+
+                    O = transformations.quaternion_matrix([o.pose.orientation.x, o.pose.orientation.y, o.pose.orientation.z, o.pose.orientation.w])
+                    O[0,3] = o.pose.position.x
+                    O[1,3] = o.pose.position.y 
+                    O[2,3] = o.pose.position.z
 
 
-        # Generate a grasps for along z axis (x and y directions)
-
-        k = 0
-        while k <= 4:
-
-            O.append(transformations.quaternion_matrix([o[k].pose.orientation.x, o[k].pose.orientation.y, o[k].pose.orientation.z, o[k].pose.orientation.w]))
-            O[k][0,3] = o[k].pose.position.x
-            O[k][1,3] = o[k].pose.position.y 
-            O[k][2,3] = o[k].pose.position.z
-
-            if k in range(0,3):
-                for z in self.drange(-target_size[2]/2, target_size[2]/2, 0.02):
-#                    print z
-
-                    T = np.dot(O[k], G)
-
-                    grasp = deepcopy(o[k])
-
-                    grasp.pose.position.x = T[0,3]
+                    T = np.dot(O, G)
+                    grasp = deepcopy(o)
+                    grasp.pose.position.x = T[0,3] -0.18
                     grasp.pose.position.y = T[1,3]
                     grasp.pose.position.z = T[2,3] +z
 
@@ -316,53 +269,9 @@ class MoveItDemo:
                     grasp.pose.orientation.w = quat[3]
                     grasp.header.frame_id = REFERENCE_FRAME
 
-                    # Append the grasp to the list
-                    grasps.append(deepcopy(grasp))
-
-            elif k == 3:
-                for x in self.drange(-target_size[1]/2, target_size[1]/2, 0.01):
-#                    print z
-
-                    T = np.dot(O[k], G)
-
-                    grasp = deepcopy(o[k])
-
-                    grasp.pose.position.x = T[0,3] +x
-                    grasp.pose.position.y = T[1,3]
-                    grasp.pose.position.z = T[2,3] 
-
-                    quat = transformations.quaternion_from_matrix(T)
-                    grasp.pose.orientation.x = quat[0]
-                    grasp.pose.orientation.y = quat[1]
-                    grasp.pose.orientation.z = quat[2]
-                    grasp.pose.orientation.w = quat[3]
-                    grasp.header.frame_id = REFERENCE_FRAME
 
                     # Append the grasp to the list
                     grasps.append(deepcopy(grasp))
-            else:
-                for y in self.drange(-target_size[1]/2, target_size[1]/2, 0.01):
-#                    print z
-
-                    T = np.dot(O[k], G)
-
-                    grasp = deepcopy(o[k])
-
-                    grasp.pose.position.x = T[0,3] 
-                    grasp.pose.position.y = T[1,3] +y
-                    grasp.pose.position.z = T[2,3] 
-
-                    quat = transformations.quaternion_from_matrix(T)
-                    grasp.pose.orientation.x = quat[0]
-                    grasp.pose.orientation.y = quat[1]
-                    grasp.pose.orientation.z = quat[2]
-                    grasp.pose.orientation.w = quat[3]
-                    grasp.header.frame_id = REFERENCE_FRAME
-
-                    # Append the grasp to the list
-                    grasps.append(deepcopy(grasp))
-
-            k+=1
 
         # Return the list
         return grasps
@@ -414,18 +323,18 @@ class MoveItDemo:
         while True:
             next_call = next_call+1
             target_id = 'target'
-            self.taid = self.pwh.name.index('custom_0')
+            self.taid = self.pwh.name.index('custom_1')
             table_id = 'table'
             self.tid = self.pwh.name.index('table') 
             obstacle1_id = 'obstacle1'
-            self.o1id = self.pwh.name.index('custom_1')
+            self.o1id = self.pwh.name.index('wood_cube_5cm')
             obstacle2_id = 'obstacle2'
             self.o2id = self.pwh.name.index('custom_2')
 
             # Set the sizes [l, w, h]
             table_size = [1.5, 0.8, 0.03]
-            target_size = [0.025, 0.025, 0.15]
-            obstacle1_size = [0.05, 0.05, 0.15]
+            target_size = [0.05, 0.05, 0.15]
+            obstacle1_size = [0.05, 0.05, 0.05]
             obstacle2_size = [0.05, 0.05, 0.10]
 
             ## Set the target pose on the table
@@ -445,6 +354,7 @@ class MoveItDemo:
                 obstacle1_pose = PoseStamped()
                 obstacle1_pose.header.frame_id = REFERENCE_FRAME
                 obstacle1_pose.pose = self.pwh.pose[self.o1id]
+                obstacle1_pose.pose.position.z += 0.025
                 # Add the target object to the scene 
                 self.scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
 
@@ -454,10 +364,8 @@ class MoveItDemo:
                 # Add the target object to the scene 
                 self.scene.add_box(obstacle2_id, obstacle2_pose, obstacle2_size)
 
-                ### Make the target purple and obstacles orange ###
+                ### Make the target purple ###
                 self.setColor(target_id, 0.6, 0, 1, 1.0)
-                self.setColor(obstacle1_id, 1, 0.623, 0, 1.0)
-                self.setColor(obstacle2_id, 1, 0.623, 0, 1.0)
 
                 # Send the colors to the planning scene
                 self.sendColors()
