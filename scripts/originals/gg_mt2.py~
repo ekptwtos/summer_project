@@ -17,7 +17,7 @@ import numpy as np
 import  pr2_controllers_msgs.msg as pr2c 
 import time, threading
 from shape_msgs.msg import SolidPrimitive
-from summer_project.msg import CGrasp as cgrasp
+from summer_project.msg import CGrasp 
 
 
 
@@ -127,44 +127,78 @@ class MoveItDemo:
 
         print "==================== Generating Transformations ==========================="
 
-        #################### PRE GRASPING POSES #########################
-
+        #################### PRE GRASPING / GRASPING POSES #########################
+        test = []
         init_poses = []
-        init_pose_x = self.pg(target_pose, 0)
-        init_poses.append(init_pose_x) 
-        init_pose_yr = self.pg(target_pose, 1)
-        init_poses.append(init_pose_yr)  
-        init_pose_yl = self.pg(target_pose, 2) 
-        init_poses.append(init_pose_yl) 
-        init_pose_zx = self.pg(target_pose, 3) 
-        init_poses.append(init_pose_zx) 
-        init_pose_zy = self.pg(target_pose, 4) 
-        init_poses.append(init_pose_zy) 
+        grasp_poses = []
+        cgrasp = CGrasp
+        for axis in range(0,5):
+            pg = self.grasp_pose(target_pose, axis, 'pg')
+            gp = self.grasp_pose(target_pose, axis, 'gp')
+            cgrasp.grasp_poses = self.grasp_pose(target_pose, axis, 'pg')
+            print axis
+            if axis == 0:
+                print "zero"
+                cgrasp.id = 'front'
+                print cgrasp.id
+            elif axis == 1:
+                print "one"
+                cgrasp.id = 'right'
+            elif axis == 2:
+                print "two"
+                cgrasp.id = 'left'
+            elif axis == 3:
+                print "three"
+                cgrasp.id = 'topx'
+            else:
+                print "four"
+                cgrasp.id = 'topy'
+            init_poses.append(pg)
+            grasp_poses.append(gp)
+            test.append(cgrasp)
 
         ################################## TESTING AREA #####################################
+        print test[0].id
 
-        test =[]
-        test2 = []
-        cgrasp.id = "x"
-        cgrasp.grasp_pose = init_poses[0]
-        test.append(cgrasp)
-        cgrasp.id = "x"
-        cgrasp.grasp_pose = init_poses[1]
-        test.append(cgrasp)
-        
-        print "============== test 1 =================="
-        print ( test )
+#        for i in range(0,5):
+#            print init_poses[i]
+#            print "=================================="
+#            print (test[i].id , test[i].grasp_poses)
 
 
-        for i in range(0,2):
-            cgrasp.grasp_pose = init_poses[i]
-            cgrasp.id = "x"
-            test2.append(cgrasp)
-        t = len(test)
-        for j in range(0,t):
-            print j
-            print "============== test 2 =================="
-            print (test2[j].id, test2[j].grasp_pose)
+
+#        test =[]
+#        test2 = []
+#        cgrasp.id = "x"
+#        cgrasp.grasp_pose = init_poses[0]
+#        print init_poses[0]
+#        print cgrasp.grasp_pose
+#        test.append(cgrasp)
+#        print test[0].grasp_pose
+#        cgrasp.grasp_pose = init_poses[1]
+#        test.append(cgrasp)
+#        print init_poses[1]
+#        print cgrasp.grasp_pose
+#        print test[1].grasp_pose
+#        cgrasp.id = "x"
+#        cgrasp.grasp_pose = init_poses[1]
+#        test.append(cgrasp)
+
+##        print "============== test 1 =================="
+##        print test[0].grasp_pose
+##        print test[1].grasp_pose
+
+#        for i in range(0,3):
+#            cgrasp.grasp_pose = init_poses[i]
+#            cgrasp.id = "x"
+#            test2.append(cgrasp)
+#        t = len(test)
+#        for j in range(0,t):
+#            print j
+#            print "============== test 2 =================="
+#            print (test2[j].id, test2[j].grasp_pose)
+#            print "INTI POSES==================="
+#            print (init_poses[j])
 
 
 
@@ -215,7 +249,7 @@ class MoveItDemo:
         self.pwh = ModelStates()
         self.pwh = msg
 
-    def pg(self, target_pose, axis):
+    def grasp_pose(self, target_pose, axis, stage ):
 
         ############ TODO : GENERATE AUTOMATED PRE-GRASPING POSITIONS BASED ON THE PRIMITIVE #########
 
@@ -226,7 +260,10 @@ class MoveItDemo:
             M1[2,3] = target_pose.pose.position.z
 
             M2 = transformations.euler_matrix(0, 0, 0)
-            M2[0,3] = -0.25  # offset about x
+            if stage == 'pg':
+                M2[0,3] = -0.25  # offset about x
+            elif stage == 'gp':
+                M2[0,3] = -0.07  # offset about x
             M2[1,3] = 0.0   # about y
             M2[2,3] = 0.0 # about z
 
@@ -239,8 +276,12 @@ class MoveItDemo:
 
             M2 = transformations.euler_matrix(0, 0, 1.57)
             M2[0,3] = 0.0  # offset about x
-            M2[1,3] = -0.25  # about y
+            if stage == 'pg':
+                M2[1,3] = -0.25  # about y
+            elif stage == 'gp':
+                M2[1,3] = -0.07  # about y
             M2[2,3] = 0.0 # about z
+
         elif axis ==2:
             M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
             M1[0,3] = target_pose.pose.position.x
@@ -249,7 +290,10 @@ class MoveItDemo:
 
             M2 = transformations.euler_matrix(0, 0, -1.57)
             M2[0,3] = 0.0  # offset about x
-            M2[1,3] = 0.25  # about y
+            if stage == 'pg':
+                M2[1,3] = 0.25  # about y
+            elif stage == 'gp':
+                M2[1,3] = 0.07  # about y
             M2[2,3] = 0.0 # about z
 
         elif axis ==3:
@@ -261,7 +305,11 @@ class MoveItDemo:
             M2 = transformations.euler_matrix(0, 1.57, 0)
             M2[0,3] = 0.0  # offset about x
             M2[1,3] = 0.0  # about y
-            M2[2,3] = 0.30 # about z
+            if stage == 'pg':
+                M2[2,3] = 0.30 # about z
+            elif stage == 'gp':
+                M2[2,3] = 0.10 # about z
+
         else:
             M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
             M1[0,3] = target_pose.pose.position.x
@@ -271,22 +319,26 @@ class MoveItDemo:
             M2 = transformations.euler_matrix(1.57, 1.57, 0)
             M2[0,3] = 0.0  # offset about x
             M2[1,3] = 0.0  # about y
-            M2[2,3] = 0.30 # about z
+            if stage == 'pg':
+                M2[2,3] = 0.30 # about z
+            elif stage == 'gp':
+                M2[2,3] = 0.10 # about z
 
         T1 = np.dot(M1,  M2)
-        pg = deepcopy(target_pose)
-        pg.pose.position.x = T1[0,3] 
-        pg.pose.position.y = T1[1,3]
-        pg.pose.position.z = T1[2,3]
+        grasp_pose = deepcopy(target_pose)
+        grasp_pose.pose.position.x = T1[0,3] 
+        grasp_pose.pose.position.y = T1[1,3]
+        grasp_pose.pose.position.z = T1[2,3]
 
         quat = transformations.quaternion_from_matrix(T1)
-        pg.pose.orientation.x = quat[0]
-        pg.pose.orientation.y = quat[1]
-        pg.pose.orientation.z = quat[2]
-        pg.pose.orientation.w = quat[3]
-        pg.header.frame_id = REFERENCE_FRAME ##'gazebo_world'
+        grasp_pose.pose.orientation.x = quat[0]
+        grasp_pose.pose.orientation.y = quat[1]
+        grasp_pose.pose.orientation.z = quat[2]
+        grasp_pose.pose.orientation.w = quat[3]
+        grasp_pose.header.frame_id = REFERENCE_FRAME 
 
-        return pg
+        return grasp_pose
+
 
     def grasp_generator(self, initial_poses):
 
@@ -436,18 +488,18 @@ class MoveItDemo:
         while True:
             next_call = next_call+1
             target_id = 'target'
-            self.taid = self.pwh.name.index('custom_1')
+            self.taid = self.pwh.name.index('custom_0')
             table_id = 'table'
             self.tid = self.pwh.name.index('table') 
             obstacle1_id = 'obstacle1'
-            self.o1id = self.pwh.name.index('wood_cube_5cm')
+            self.o1id = self.pwh.name.index('custom_1')
             obstacle2_id = 'obstacle2'
             self.o2id = self.pwh.name.index('custom_2')
 
             # Set the sizes [l, w, h]
             table_size = [1.5, 0.8, 0.03]
-            target_size = [0.05, 0.05, 0.15]
-            obstacle1_size = [0.05, 0.05, 0.05]
+            target_size = [0.025, 0.025, 0.15]
+            obstacle1_size = [0.05, 0.05, 0.15]
             obstacle2_size = [0.05, 0.05, 0.10]
 
             ## Set the target pose on the table
@@ -467,7 +519,6 @@ class MoveItDemo:
                 obstacle1_pose = PoseStamped()
                 obstacle1_pose.header.frame_id = REFERENCE_FRAME
                 obstacle1_pose.pose = self.pwh.pose[self.o1id]
-                obstacle1_pose.pose.position.z += 0.025
                 # Add the target object to the scene 
                 self.scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
 
@@ -489,6 +540,7 @@ class MoveItDemo:
 
             time.sleep(next_call - time.time())
         #threading.Timer(0.5, self.scene_generator).start()
+
 
     # Set the color of an object
     def setColor(self, name, r, g, b, a = 0.9):

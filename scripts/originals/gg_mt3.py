@@ -17,8 +17,8 @@ import numpy as np
 import  pr2_controllers_msgs.msg as pr2c 
 import time, threading
 from shape_msgs.msg import SolidPrimitive
-from summer_project.msg import CGrasp 
-
+from summer_project.msg import CGrasp as cgrasp
+import itertools
 
 
 GROUP_NAME_ARM = 'right_arm'
@@ -128,78 +128,41 @@ class MoveItDemo:
         print "==================== Generating Transformations ==========================="
 
         #################### PRE GRASPING / GRASPING POSES #########################
-        test = []
+
         init_poses = []
         grasp_poses = []
-        cgrasp = CGrasp
         for axis in range(0,5):
             pg = self.grasp_pose(target_pose, axis, 'pg')
             gp = self.grasp_pose(target_pose, axis, 'gp')
-            cgrasp.grasp_poses = self.grasp_pose(target_pose, axis, 'pg')
-            print cgrasp.grasp_poses
-            print axis
-            if axis == 0:
-                print "zero"
-                cgrasp.id = 'front'
-                print cgrasp.id
-            elif axis == 1:
-                print "one"
-                cgrasp.id = 'right'
-            elif axis == 2:
-                print "two"
-                cgrasp.id = 'left'
-            elif axis == 3:
-                print "three"
-                cgrasp.id = 'topx'
-            else:
-                print "four"
-                cgrasp.id = 'topy'
             init_poses.append(pg)
             grasp_poses.append(gp)
-            test.append(cgrasp)
+#        print ("===============INIT POSES===============", init_poses, "==================GRASP POSES==================", grasp_poses)
+
 
         ################################## TESTING AREA #####################################
-        print test[0].id
+        success = False
+        n_attempts = 0
+        max_pick_attempts = 5
 
-#        for i in range(0,5):
-#            print init_poses[i]
-#            print "=================================="
-#            print (test[i].id , test[i].grasp_poses)
+        ato = [target_id]
+        pre_grasps = self.grasp_generator(init_poses, ato)
+#        grasps = self.grasp_generator(grasp_poses)
+
+        for pgr in pre_grasps:
+            self.gripper_pose_pub.publish(pgr.grasp_pose)
+            rospy.sleep(0.1)
 
 
 
-#        test =[]
-#        test2 = []
-#        cgrasp.id = "x"
-#        cgrasp.grasp_pose = init_poses[0]
-#        print init_poses[0]
-#        print cgrasp.grasp_pose
-#        test.append(cgrasp)
-#        print test[0].grasp_pose
-#        cgrasp.grasp_pose = init_poses[1]
-#        test.append(cgrasp)
-#        print init_poses[1]
-#        print cgrasp.grasp_pose
-#        print test[1].grasp_pose
-#        cgrasp.id = "x"
-#        cgrasp.grasp_pose = init_poses[1]
-#        test.append(cgrasp)
+        while success == False:
+            success = self.right_arm.pick(target_id, pre_grasps)
+            n_attempts += 1
+            rospy.loginfo("Pick attempt: " +  str(n_attempts))
+            rospy.sleep(0.2)
 
-##        print "============== test 1 =================="
-##        print test[0].grasp_pose
-##        print test[1].grasp_pose
 
-#        for i in range(0,3):
-#            cgrasp.grasp_pose = init_poses[i]
-#            cgrasp.id = "x"
-#            test2.append(cgrasp)
-#        t = len(test)
-#        for j in range(0,t):
-#            print j
-#            print "============== test 2 =================="
-#            print (test2[j].id, test2[j].grasp_pose)
-#            print "INTI POSES==================="
-#            print (init_poses[j])
+
+
 
 
 
@@ -207,31 +170,68 @@ class MoveItDemo:
         ################# GENERATE GRASPS ###################
 
 
-#        grasps = self.grasp_generator(init_poses)
+#        pre_grasps = self.grasp_generator(init_poses)
+#        grasps = self.grasp_generator(grasp_poses)
+
+##        for pre_grasp,grasp in itertools.izip(pre_grasps,grasps):
+###            print("PREGRASP==============================",pre_grasp,"GRASP==================",grasp)
+##            self.gripper_pose_pub.publish(grasp)
+##            rospy.sleep(0.1)
+
+#        for l in range(0,11): # 10 planning tries
+#        for pgr,gr in itertools.izip(pre_grasps,grasps):
+#            pl = self.right_arm.plan(pgr)
+#            if len(pl.joint_trajectory.points) >=10:  #!= 0: ## FAILED PLANS HAVE LEN = 0 
+#                print (pgr)
+#                if self.right_arm.go(pgr) == True:
+#                    self.right_arm.go(pgr)
+#                    if self.right_arm.go(gr) == True:
+#                            self.right_arm.go(gr)
+#                            break
 
 
-#        for grasp in grasps:
-#            print grasp.grasp_pose
-##            print grasp.id 
-#            self.gripper_pose_pub.publish(grasp.grasp_pose)
+
+
+
+
+#        for pre_grasp,grasp in itertools.izip(pre_grasps,grasps):
+#            # PRE GRASP PLAN
+#            pgp = self.right_arm.plan(pre_grasp)
+#            # GRASP PLAN
+#            gpp = self.right_arm.plan(grasp)
+#            print len(pgp.joint_trajectory.points)
+#            if len(pgp.joint_trajectory.points) >=10 and len(pgp.joint_trajectory.points) >=10:
+#                if self.right_arm.go(grasp) == True:
+#                    print "executing grasp"
+#                    self.right_arm.go(grasp)
+#                    break
+
+
+#        for grasp in pre_grasps:
+#            print grasp
+#            self.gripper_pose_pub.publish(grasp)
 #            rospy.sleep(0.2)
 
+#        for grasp in grasps:
+#            print grasp
+#            self.gripper_pose_pub.publish(grasp)
+#            rospy.sleep(0.2)
 
 #        for grasp in grasps:
 
 #            pl = self.right_arm.plan(grasp)
 #            print len(pl.joint_trajectory.points)
 #            if len(pl.joint_trajectory.points) >=10:  #!= 0: ## FAILED PLANS HAVE LEN = 0 
-#                self.right_arm.clear_pose_target(GRIPPER_FRAME)
-#                self.right_arm.set_pose_target(grasp)
-#                self.right_arm.shift_pose_target(0, 0.07, GRIPPER_FRAME)
-#                if self.right_arm.go() == True:
+##                self.right_arm.clear_pose_target(GRIPPER_FRAME)
+##                self.right_arm.set_pose_target(grasp)
+##                self.right_arm.shift_pose_target(0, 0.07, GRIPPER_FRAME)
+#                if self.right_arm.go(grasp) == True:
 #                    print "executing grasp"
-#                    self.right_arm.go()
+#                    self.right_arm.go(grasp)
 #                    break
 
 
-
+        rospy.sleep(5)
 
 #        # Shut down MoveIt cleanly
         moveit_commander.roscpp_shutdown()
@@ -249,6 +249,34 @@ class MoveItDemo:
 
         self.pwh = ModelStates()
         self.pwh = msg
+
+    def gpt(self, target_pose):
+
+        K = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
+        K[0,3] = target_pose.pose.position.x
+        K[1,3] = target_pose.pose.position.y 
+        K[2,3] = target_pose.pose.position.z
+
+        L = transformations.euler_matrix(0, 0, 0)
+        L[0,3] = -0.18  # offset about x
+        L[1,3] = 0.0   # about y
+        L[2,3] = 0.0 # about z
+
+        G = np.dot(K,  L)
+        gpt = deepcopy(target_pose)
+        gpt.pose.position.x = G[0,3] 
+        gpt.pose.position.y = G[1,3]
+        gpt.pose.position.z = G[2,3]
+
+        quat1 = transformations.quaternion_from_matrix(G)
+        gpt.pose.orientation.x = quat1[0]
+        gpt.pose.orientation.y = quat1[1]
+        gpt.pose.orientation.z = quat1[2]
+        gpt.pose.orientation.w = quat1[3]
+        gpt.header.frame_id = REFERENCE_FRAME 
+
+
+
 
     def grasp_pose(self, target_pose, axis, stage ):
 
@@ -341,13 +369,14 @@ class MoveItDemo:
         return grasp_pose
 
 
-    def grasp_generator(self, initial_poses):
+
+    def grasp_generator(self, initial_poses, ato):
 
         # A list to hold the grasps
         grasps = []
         o = []        # Original Pose of the object (o)
         O=[]
-
+        g = Grasp()
 
         i= 0
         while i < len(initial_poses):
@@ -369,73 +398,77 @@ class MoveItDemo:
 
             if k in range(0,3):
                 for z in self.drange(-target_size[2]/2, target_size[2]/2, 0.02):
-
-                    if k == 0:
-                        cgrasp.id = 'front'
-                    elif k ==1:
-                        cgrasp.id = 'right'
-                    else:
-                        cgrasp.id = 'left'
+#                    print z
 
                     T = np.dot(O[k], G)
-                    cgrasp.grasp_pose = deepcopy(o[k])
 
-                    cgrasp.grasp_pose.pose.position.x = T[0,3]
-                    cgrasp.grasp_pose.pose.position.y = T[1,3]
-                    cgrasp.grasp_pose.pose.position.z = T[2,3] +z
+                    g.grasp_pose = deepcopy(o[k])
+
+                    g.grasp_pose.pose.position.x = T[0,3]
+                    g.grasp_pose.pose.position.y = T[1,3]
+                    g.grasp_pose.pose.position.z = T[2,3] +z
 
                     quat = transformations.quaternion_from_matrix(T)
-                    cgrasp.grasp_pose.pose.orientation.x = quat[0]
-                    cgrasp.grasp_pose.pose.orientation.y = quat[1]
-                    cgrasp.grasp_pose.pose.orientation.z = quat[2]
-                    cgrasp.grasp_pose.pose.orientation.w = quat[3]
-                    cgrasp.grasp_pose.header.frame_id = REFERENCE_FRAME
+                    g.grasp_pose.pose.orientation.x = quat[0]
+                    g.grasp_pose.pose.orientation.y = quat[1]
+                    g.grasp_pose.pose.orientation.z = quat[2]
+                    g.grasp_pose.pose.orientation.w = quat[3]
+                    g.grasp_pose.header.frame_id = REFERENCE_FRAME
+
+                    g.id = str(len(grasps))
+                    g.allowed_touch_objects = ato
 
                     # Append the grasp to the list
-                    grasps.append(deepcopy(cgrasp))
+                    grasps.append(deepcopy(g))
 
             elif k == 3:
                 for x in self.drange(-target_size[1]/2, target_size[1]/2, 0.01):
 #                    print z
-                    cgrasp.id = 'topx'
+
                     T = np.dot(O[k], G)
 
-                    cgrasp.grasp_pose = deepcopy(o[k])
+                    g.grasp_pose = deepcopy(o[k])
 
-                    cgrasp.grasp_pose.pose.position.x = T[0,3] +x
-                    cgrasp.grasp_pose.pose.position.y = T[1,3]
-                    cgrasp.grasp_pose.pose.position.z = T[2,3] 
+                    g.grasp_pose.pose.position.x = T[0,3] +x
+                    g.grasp_pose.pose.position.y = T[1,3]
+                    g.grasp_pose.pose.position.z = T[2,3] 
 
                     quat = transformations.quaternion_from_matrix(T)
-                    cgrasp.grasp_pose.pose.orientation.x = quat[0]
-                    cgrasp.grasp_pose.pose.orientation.y = quat[1]
-                    cgrasp.grasp_pose.pose.orientation.z = quat[2]
-                    cgrasp.grasp_pose.pose.orientation.w = quat[3]
-                    cgrasp.grasp_pose.header.frame_id = REFERENCE_FRAME
+                    g.grasp_pose.pose.orientation.x = quat[0]
+                    g.grasp_pose.pose.orientation.y = quat[1]
+                    g.grasp_pose.pose.orientation.z = quat[2]
+                    g.grasp_pose.pose.orientation.w = quat[3]
+                    g.grasp_pose.header.frame_id = REFERENCE_FRAME
+
+                    g.id = str(len(grasps))
+                    g.allowed_touch_objects = ato
 
                     # Append the grasp to the list
-                    grasps.append(deepcopy(cgrasp))
+                    grasps.append(deepcopy(g))
             else:
                 for y in self.drange(-target_size[1]/2, target_size[1]/2, 0.01):
 #                    print z
-                    cgrasp.id = 'topy'
+
                     T = np.dot(O[k], G)
 
-                    grasp = deepcopy(o[k])
+                    g.grasp_pose = deepcopy(o[k])
 
-                    cgrasp.grasp_pose.pose.position.x = T[0,3] 
-                    cgrasp.grasp_pose.pose.position.y = T[1,3] +y
-                    cgrasp.grasp_pose.pose.position.z = T[2,3] 
+                    g.grasp_pose.pose.position.x = T[0,3] 
+                    g.grasp_pose.pose.position.y = T[1,3] +y
+                    g.grasp_pose.pose.position.z = T[2,3] 
 
                     quat = transformations.quaternion_from_matrix(T)
-                    cgrasp.grasp_pose.pose.orientation.x = quat[0]
-                    cgrasp.grasp_pose.pose.orientation.y = quat[1]
-                    cgrasp.grasp_pose.pose.orientation.z = quat[2]
-                    cgrasp.grasp_pose.pose.orientation.w = quat[3]
-                    cgrasp.grasp_pose.header.frame_id = REFERENCE_FRAME
+                    g.grasp_pose.pose.orientation.x = quat[0]
+                    g.grasp_pose.pose.orientation.y = quat[1]
+                    g.grasp_pose.pose.orientation.z = quat[2]
+                    g.grasp_pose.pose.orientation.w = quat[3]
+                    g.grasp_pose.header.frame_id = REFERENCE_FRAME
+
+                    g.id = str(len(grasps))
+                    g.allowed_touch_objects = ato
 
                     # Append the grasp to the list
-                    grasps.append(deepcopy(cgrasp))
+                    grasps.append(deepcopy(g))
 
             k+=1
 
@@ -456,10 +489,6 @@ class MoveItDemo:
         self.right_arm.plan()
         rospy.sleep(5)
         self.right_arm.go(wait=True)
-
-#    def grasp_plan(self, pose):
-
-#        # put here the grasping lines
 
 
 
@@ -541,7 +570,6 @@ class MoveItDemo:
 
             time.sleep(next_call - time.time())
         #threading.Timer(0.5, self.scene_generator).start()
-
 
     # Set the color of an object
     def setColor(self, name, r, g, b, a = 0.9):
