@@ -1,7 +1,0 @@
-
-NORMAL GENERATOR
-
-
-
-#            for y in self.drange(-1.57, 1.57 , 0.2):
-#                for p in self.drange(0, 3.14 , 0.2):

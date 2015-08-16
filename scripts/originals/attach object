@@ -1,0 +1,9 @@
+        #################### ATTACH OBJECT ######################
+
+        touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link']
+        #print touch_links
+        self.scene.attach_box(GRIPPER_FRAME, target_id, target_pose, target_size, touch_links)
+
+        # counter to let the planning scene know when to remove the object
+        obj_att = 1
+
