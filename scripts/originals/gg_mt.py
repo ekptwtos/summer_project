@@ -331,7 +331,7 @@ class MoveItDemo:
         place_pose.pose.position.z = 0.53
         place_pose.pose.orientation.w = 1.0
 
-    def grasp_pose(self, target_pose, axis, stage ):
+    def grasp_pose(self, target_pose, axis, stage):
 
         ############ TODO : GENERATE AUTOMATED PRE-GRASPING POSITIONS BASED ON THE PRIMITIVE #########
 

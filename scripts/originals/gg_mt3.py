@@ -18,7 +18,8 @@ import  pr2_controllers_msgs.msg as pr2c
 import time, threading
 from shape_msgs.msg import SolidPrimitive
 from summer_project.msg import CGrasp as cgrasp
-import itertools
+from itertools import izip
+import xml.etree.ElementTree as ET
 
 
 GROUP_NAME_ARM = 'right_arm'
@@ -39,8 +40,6 @@ REFERENCE_FRAME = 'base_footprint'
 
 class MoveItDemo:
     def __init__(self):
-
-
 
         # Initialize the move_group API
         moveit_commander.roscpp_initialize(sys.argv)
@@ -71,13 +70,16 @@ class MoveItDemo:
 
         # Initialize the MoveIt! commander for the arm
         self.right_arm = MoveGroupCommander(GROUP_NAME_ARM)
+        self.left_arm = MoveGroupCommander('left_arm')
 
         # Initialize the MoveIt! commander for the gripper
         self.right_gripper = MoveGroupCommander(GROUP_NAME_GRIPPER)
+        self.left_gripper = MoveGroupCommander('left_gripper')
+
 #        eel = len(self.right_arm.get_end_effector_link())
 #        print eel
         # Allow 5 seconds per planning attempt
-        self.right_arm.set_planning_time(5)
+#        self.right_arm.set_planning_time(5)
 
         # Prepare Action Controller for gripper
         self.ac = actionlib.SimpleActionClient('r_gripper_controller/gripper_action',pr2c.Pr2GripperCommandAction)
@@ -92,144 +94,68 @@ class MoveItDemo:
         self.idx_targ = None
         self.gazebo_subscriber = rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_state_callback)
 
-#        self.m_error = rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_state_callback)
 
 
         ### OPEN THE GRIPPER ###
         self.open_gripper()
-
-        self.obj_att = None
 
 
         # PREPARE THE SCENE
         while self.pwh is None:
             rospy.sleep(0.05)
 
-        ############## CLEAR THE SCENE ################
+        ### Attach / Remove Object Flag ###
+        self.aro = None
+
+        # Run and keep in the BG the scene generator ### TODO: Add the ability to kill the code with ctrl^c
+        self.scene_generator()
+
+        ### GENERATE THE BLACKLIST AND REMOVE ATTACHED OBJECTS FROM PREVIOUS RUNS ###
+        self.idx_list = self.bl()
+
+        ### GIVE SCENE TIME TO CATCH UP ###
+        rospy.sleep(5)
 
 
-#        planning_scene.world.collision_objects.remove('target')
+        ################################## GRASP EXECUTION #####################################
+        print "==================== Executing ==========================="
 
-        # Remove leftover objects from a previous run
-        self.scene.remove_world_object('target')
-        self.scene.remove_world_object('table')
-#        self.scene.remove_world_object(obstacle1_id)
-
-        # Remove any attached objects from a previous session
-        self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
-
-        # Run and keep in the BG the scene generator also add the ability to kill the code with ctrl^c
-        timerThread = threading.Thread(target=self.scene_generator)
-        timerThread.daemon = True
-        timerThread.start()
+        ### PERSONAL REMINDER!!! WHAT IS WHAT!!! ###
+#        print obj_id[obj_id.index('target')]
+#        print obj_id.index('target')
 
 
 
-        print "==================== Generating Transformations ==========================="
+        ### Give the arms starting positions ###
 
-        #################### PRE GRASPING / GRASPING POSES #########################
-
-        init_poses = []
-        grasp_poses = []
-        for axis in range(0,5):
-            pg = self.grasp_pose(target_pose, axis, 'pg')
-            gp = self.grasp_pose(target_pose, axis, 'gp')
-            init_poses.append(pg)
-            grasp_poses.append(gp)
-#        print ("===============INIT POSES===============", init_poses, "==================GRASP POSES==================", grasp_poses)
+        self.lasp()
+#        self.rasp()
 
 
-        ################################## TESTING AREA #####################################
         success = False
-        n_attempts = 0
-        max_pick_attempts = 5
+        while success == False and len(self.idx_list)>0:
 
-        ato = [target_id]
-        pre_grasps = self.grasp_generator(init_poses, ato)
-#        grasps = self.grasp_generator(grasp_poses)
+            success = self.grasp_attempt()
+            print ("GA Returns:", success)
+            if success is not False:
+                self.flag = 0 # To let the planning scene know when to remove the object
+                self.place_object(obj_id.index('target'))
+                break
 
-        for pgr in pre_grasps:
-            self.gripper_pose_pub.publish(pgr.grasp_pose)
-            rospy.sleep(0.1)
+            else:
+                idx = self.idx_list[0]
+                n_pose, ds = self.declutter_scene(idx)
+                print ("DS Returns:", ds)
 
-
-
-        while success == False:
-            success = self.right_arm.pick(target_id, pre_grasps)
-            n_attempts += 1
-            rospy.loginfo("Pick attempt: " +  str(n_attempts))
-            rospy.sleep(0.2)
-
+                if ds == True:
+                    self.flag = 0 # To let the planning scene know when to remove the object
+                    self.place_object(obj_id.index(obj_id[idx]))
 
 
+                self.idx_list.pop(0) 
 
 
-
-
-
-        ################# GENERATE GRASPS ###################
-
-
-#        pre_grasps = self.grasp_generator(init_poses)
-#        grasps = self.grasp_generator(grasp_poses)
-
-##        for pre_grasp,grasp in itertools.izip(pre_grasps,grasps):
-###            print("PREGRASP==============================",pre_grasp,"GRASP==================",grasp)
-##            self.gripper_pose_pub.publish(grasp)
-##            rospy.sleep(0.1)
-
-#        for l in range(0,11): # 10 planning tries
-#        for pgr,gr in itertools.izip(pre_grasps,grasps):
-#            pl = self.right_arm.plan(pgr)
-#            if len(pl.joint_trajectory.points) >=10:  #!= 0: ## FAILED PLANS HAVE LEN = 0 
-#                print (pgr)
-#                if self.right_arm.go(pgr) == True:
-#                    self.right_arm.go(pgr)
-#                    if self.right_arm.go(gr) == True:
-#                            self.right_arm.go(gr)
-#                            break
-
-
-
-
-
-
-#        for pre_grasp,grasp in itertools.izip(pre_grasps,grasps):
-#            # PRE GRASP PLAN
-#            pgp = self.right_arm.plan(pre_grasp)
-#            # GRASP PLAN
-#            gpp = self.right_arm.plan(grasp)
-#            print len(pgp.joint_trajectory.points)
-#            if len(pgp.joint_trajectory.points) >=10 and len(pgp.joint_trajectory.points) >=10:
-#                if self.right_arm.go(grasp) == True:
-#                    print "executing grasp"
-#                    self.right_arm.go(grasp)
-#                    break
-
-
-#        for grasp in pre_grasps:
-#            print grasp
-#            self.gripper_pose_pub.publish(grasp)
-#            rospy.sleep(0.2)
-
-#        for grasp in grasps:
-#            print grasp
-#            self.gripper_pose_pub.publish(grasp)
-#            rospy.sleep(0.2)
-
-#        for grasp in grasps:
-
-#            pl = self.right_arm.plan(grasp)
-#            print len(pl.joint_trajectory.points)
-#            if len(pl.joint_trajectory.points) >=10:  #!= 0: ## FAILED PLANS HAVE LEN = 0 
-##                self.right_arm.clear_pose_target(GRIPPER_FRAME)
-##                self.right_arm.set_pose_target(grasp)
-##                self.right_arm.shift_pose_target(0, 0.07, GRIPPER_FRAME)
-#                if self.right_arm.go(grasp) == True:
-#                    print "executing grasp"
-#                    self.right_arm.go(grasp)
-#                    break
-
+        print "==================== THE END! ======================"
 
         rospy.sleep(5)
 
@@ -244,41 +170,210 @@ class MoveItDemo:
 ################################################################# FUNCTIONS #################################################################################
 
 
-
-    def model_state_callback(self,msg):
-
-        self.pwh = ModelStates()
-        self.pwh = msg
-
-    def gpt(self, target_pose):
-
-        K = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
-        K[0,3] = target_pose.pose.position.x
-        K[1,3] = target_pose.pose.position.y 
-        K[2,3] = target_pose.pose.position.z
-
-        L = transformations.euler_matrix(0, 0, 0)
-        L[0,3] = -0.18  # offset about x
-        L[1,3] = 0.0   # about y
-        L[2,3] = 0.0 # about z
-
-        G = np.dot(K,  L)
-        gpt = deepcopy(target_pose)
-        gpt.pose.position.x = G[0,3] 
-        gpt.pose.position.y = G[1,3]
-        gpt.pose.position.z = G[2,3]
-
-        quat1 = transformations.quaternion_from_matrix(G)
-        gpt.pose.orientation.x = quat1[0]
-        gpt.pose.orientation.y = quat1[1]
-        gpt.pose.orientation.z = quat1[2]
-        gpt.pose.orientation.w = quat1[3]
-        gpt.header.frame_id = REFERENCE_FRAME 
+    def grasp_attempt(self):
 
 
+        init_poses = []
+        grasp_poses = []
+        for axis in range(0,6):
+            pg = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'pg')
+            gp = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'gp')
+            init_poses.append(pg)
+            grasp_poses.append(gp)
+
+        pre_grasps = self.grasp_generator(grasp_poses)
+        grasps = self.grasp_generator(grasp_poses)
+        for grasp in grasps:
+            self.gripper_pose_pub.publish(grasp)
+            rospy.sleep(0.05)
+
+        success = False
+        i = 1
+        for pg, gr in izip(pre_grasps, grasps):
+            print ("G Attempt: ", i)
+            self.gripper_pose_pub.publish(gr)
+            plp = self.right_arm.plan(pg.pose)
+            if len(plp.joint_trajectory.points) == 0:
+                print "No valid pregrasp Position, continuing on next one"
+                i+=1
+                continue
+
+            self.right_arm.plan(pg.pose)
+            self.right_arm.go(wait=True)
+            rospy.sleep(5)
+            plg = self.right_arm.plan(gr.pose)
+            if len(plg.joint_trajectory.points) >= 10:
+                success = True
+                print "Grasping"
+                break
+
+        return success
 
 
-    def grasp_pose(self, target_pose, axis, stage ):
+    def declutter_scene(self,index):
+
+
+        init_poses = []
+        grasp_poses = []
+        for axis in range(0,6):
+            pg = self.grasp_pose(obj_pose[index], axis, 'pg')
+            gp = self.grasp_pose(obj_pose[index], axis, 'gp')
+            init_poses.append(pg)
+            grasp_poses.append(gp)
+
+        pre_grasps = self.grasp_generator(grasp_poses)
+        grasps = self.grasp_generator(grasp_poses)
+        for grasp in grasps:
+            self.gripper_pose_pub.publish(grasp)
+            rospy.sleep(0.05)
+
+        success = False
+        i= 1
+        for pg, gr in izip(pre_grasps, grasps):
+            print (" DC Attempt: ", i)
+            plp = self.right_arm.plan(pg.pose)
+            self.gripper_pose_pub.publish(gr)
+            self.right_arm.plan(pg.pose)
+            if len(plp.joint_trajectory.points) == 0:
+                print "No valid pregrasp Position, continuing on next one"
+                i+=1
+                continue
+
+            self.right_arm.plan(pg.pose)
+            self.right_arm.go()
+            rospy.sleep(5)
+
+            plg = self.right_arm.plan(gr.pose)
+            if len(plg.joint_trajectory.points) >= 10:
+                self.right_arm.go()
+                print "Grasping"
+                success = True
+                new_pose = gr
+                break
+        return (new_pose,success)
+
+    def place_object(self, obj_idx):
+
+
+        ######### GRASP OBJECT/ REMOVE FROM SCENE ######.
+
+        self.close_gripper()
+        self.aro = obj_idx
+        rospy.sleep(5)
+
+        ### GENERATE PLACE POSES ###
+        places = self.place_generator()
+
+        ### TRY THESE POSES ###
+        i = 1
+        for place in places:
+            print (" Place Attempt: ", i)
+            plpl = self.right_arm.plan(place.pose)
+            print len(plpl.joint_trajectory.points)
+            if len(plpl.joint_trajectory.points) == 0:
+                i+=1
+                continue
+            
+            self.right_arm.plan(plpl)
+            self.right_arm.go(wait=True)
+
+
+            self.open_gripper()
+            self.aro = None
+            break
+
+
+
+    def post_grasp(self,new_pose, obj_idx):
+
+        ######### GRASP OBJECT/ REMOVE FROM SCENE ######.
+
+        self.close_gripper()
+        self.aro = obj_idx
+        rospy.sleep(5)
+
+
+        ### POST GRASP RETREAT ###
+        M1 = transformations.quaternion_matrix([new_pose.pose.orientation.x, new_pose.pose.orientation.y, new_pose.pose.orientation.z, new_pose.pose.orientation.w])
+        M1[0,3] = new_pose.pose.position.x
+        M1[1,3] = new_pose.pose.position.y 
+        M1[2,3] = new_pose.pose.position.z
+
+        M2 = transformations.euler_matrix(0, 0, 0)
+
+        M2[0,3] = 0.0  # offset about x
+        M2[1,3] = 0.0   # about y
+        M2[2,3] = 0.25 # about z
+
+
+        T1 = np.dot(M1,  M2)
+        npo = deepcopy(new_pose)
+        npo.pose.position.x = T1[0,3] 
+        npo.pose.position.y = T1[1,3]
+        npo.pose.position.z = T1[2,3]
+
+        quat = transformations.quaternion_from_matrix(T1)
+        npo.pose.orientation.x = quat[0]
+        npo.pose.orientation.y = quat[1]
+        npo.pose.orientation.z = quat[2]
+        npo.pose.orientation.w = quat[3]
+        npo.header.frame_id = REFERENCE_FRAME
+        self.right_arm.plan(npo.pose) 
+        self.right_arm.go(wait=True)
+
+
+#        rospy.sleep(4)
+#        self.open_gripper()
+#        self.aro = None
+#        self.open_gripper()
+
+
+    def place_generator(self):
+
+        place_pose = PoseStamped()
+        place_pose.header.frame_id = REFERENCE_FRAME
+        place_pose.pose.position.x = 0.57
+        place_pose.pose.position.y = 0.16
+        place_pose.pose.position.z = 0.56
+        place_pose.pose.orientation.w = 1.0
+
+        P = transformations.quaternion_matrix([place_pose.pose.orientation.x, place_pose.pose.orientation.y, place_pose.pose.orientation.z, place_pose.pose.orientation.w])
+        P[0,3] = place_pose.pose.position.x
+        P[1,3] = place_pose.pose.position.y 
+        P[2,3] = place_pose.pose.position.z
+
+        places =[]
+        yaw_angles = [0, 1,57, -1,57 , 3,14]
+        x_vals = [0, 0.05 ,0.1 , 0.15]
+        z_vals = [0.05 ,0.1 , 0.15]
+        for y in yaw_angles:
+            G = transformations.euler_matrix(0, 0, y)
+
+            G[0,3] = 0.0  # offset about x
+            G[1,3] = 0.0   # about y
+            G[2,3] = 0.0 # about z
+
+            for z in z_vals:
+                for x in x_vals:
+
+                    TM = np.dot(P,  G)
+                    pl = deepcopy(place_pose)
+                    pl.pose.position.x = TM[0,3] +x
+                    pl.pose.position.y = TM[1,3]
+                    pl.pose.position.z = TM[2,3] +z
+
+                    quat = transformations.quaternion_from_matrix(TM)
+                    pl.pose.orientation.x = quat[0]
+                    pl.pose.orientation.y = quat[1]
+                    pl.pose.orientation.z = quat[2]
+                    pl.pose.orientation.w = quat[3]
+                    pl.header.frame_id = REFERENCE_FRAME
+                    places.append(deepcopy(pl))
+
+        return places
+
+
+    def grasp_pose(self, target_pose, axis, stage):
 
         ############ TODO : GENERATE AUTOMATED PRE-GRASPING POSITIONS BASED ON THE PRIMITIVE #########
 
@@ -292,10 +387,9 @@ class MoveItDemo:
             if stage == 'pg':
                 M2[0,3] = -0.25  # offset about x
             elif stage == 'gp':
-                M2[0,3] = -0.07  # offset about x
+                M2[0,3] = -0.18  # offset about x
             M2[1,3] = 0.0   # about y
             M2[2,3] = 0.0 # about z
-
 
         elif axis == 1:
             M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
@@ -308,10 +402,10 @@ class MoveItDemo:
             if stage == 'pg':
                 M2[1,3] = -0.25  # about y
             elif stage == 'gp':
-                M2[1,3] = -0.07  # about y
+                M2[1,3] = -0.18  # about y
             M2[2,3] = 0.0 # about z
 
-        elif axis ==2:
+        elif axis == 2:
             M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
             M1[0,3] = target_pose.pose.position.x
             M1[1,3] = target_pose.pose.position.y 
@@ -322,10 +416,24 @@ class MoveItDemo:
             if stage == 'pg':
                 M2[1,3] = 0.25  # about y
             elif stage == 'gp':
-                M2[1,3] = 0.07  # about y
+                M2[1,3] = 0.18  # about y
             M2[2,3] = 0.0 # about z
 
-        elif axis ==3:
+        elif axis == 3:
+            M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
+            M1[0,3] = target_pose.pose.position.x
+            M1[1,3] = target_pose.pose.position.y 
+            M1[2,3] = target_pose.pose.position.z
+
+            M2 = transformations.euler_matrix(0, 0, 3.14)
+            if stage == 'pg':
+                M2[0,3] = 0.25  # offset about x
+            elif stage == 'gp':
+                M2[0,3] = 0.18  # offset about x
+            M2[1,3] = 0.0  # about y
+            M2[2,3] = 0.0 # about z
+
+        elif axis == 4:
             M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
             M1[0,3] = target_pose.pose.position.x
             M1[1,3] = target_pose.pose.position.y 
@@ -337,7 +445,7 @@ class MoveItDemo:
             if stage == 'pg':
                 M2[2,3] = 0.30 # about z
             elif stage == 'gp':
-                M2[2,3] = 0.10 # about z
+                M2[2,3] = 0.23 # about z
 
         else:
             M1 = transformations.quaternion_matrix([target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z, target_pose.pose.orientation.w])
@@ -351,7 +459,9 @@ class MoveItDemo:
             if stage == 'pg':
                 M2[2,3] = 0.30 # about z
             elif stage == 'gp':
-                M2[2,3] = 0.10 # about z
+                M2[2,3] = 0.23 # about z
+
+
 
         T1 = np.dot(M1,  M2)
         grasp_pose = deepcopy(target_pose)
@@ -370,13 +480,13 @@ class MoveItDemo:
 
 
 
-    def grasp_generator(self, initial_poses, ato):
+    def grasp_generator(self, initial_poses):
 
         # A list to hold the grasps
         grasps = []
         o = []        # Original Pose of the object (o)
         O=[]
-        g = Grasp()
+
 
         i= 0
         while i < len(initial_poses):
@@ -389,91 +499,161 @@ class MoveItDemo:
         # Generate a grasps for along z axis (x and y directions)
 
         k = 0
-        while k <= 4:
+        while k <= 5:
 
             O.append(transformations.quaternion_matrix([o[k].pose.orientation.x, o[k].pose.orientation.y, o[k].pose.orientation.z, o[k].pose.orientation.w]))
             O[k][0,3] = o[k].pose.position.x
             O[k][1,3] = o[k].pose.position.y 
             O[k][2,3] = o[k].pose.position.z
 
-            if k in range(0,3):
-                for z in self.drange(-target_size[2]/2, target_size[2]/2, 0.02):
+            if k in range(0,4):
+                for z in self.drange(0.05-obj_size[obj_id.index('target')][2]/3, obj_size[obj_id.index('target')][2]/2, 0.04):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
 #                    print z
 
                     T = np.dot(O[k], G)
 
-                    g.grasp_pose = deepcopy(o[k])
+                    grasp = deepcopy(o[k])
 
-                    g.grasp_pose.pose.position.x = T[0,3]
-                    g.grasp_pose.pose.position.y = T[1,3]
-                    g.grasp_pose.pose.position.z = T[2,3] +z
+                    grasp.pose.position.x = T[0,3]
+                    grasp.pose.position.y = T[1,3]
+                    grasp.pose.position.z = T[2,3] +z
 
                     quat = transformations.quaternion_from_matrix(T)
-                    g.grasp_pose.pose.orientation.x = quat[0]
-                    g.grasp_pose.pose.orientation.y = quat[1]
-                    g.grasp_pose.pose.orientation.z = quat[2]
-                    g.grasp_pose.pose.orientation.w = quat[3]
-                    g.grasp_pose.header.frame_id = REFERENCE_FRAME
-
-                    g.id = str(len(grasps))
-                    g.allowed_touch_objects = ato
+                    grasp.pose.orientation.x = quat[0]
+                    grasp.pose.orientation.y = quat[1]
+                    grasp.pose.orientation.z = quat[2]
+                    grasp.pose.orientation.w = quat[3]
+                    grasp.header.frame_id = REFERENCE_FRAME
 
                     # Append the grasp to the list
-                    grasps.append(deepcopy(g))
+                    grasps.append(deepcopy(grasp))
+
 
             elif k == 3:
-                for x in self.drange(-target_size[1]/2, target_size[1]/2, 0.01):
+                for x in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.01):
 #                    print z
 
                     T = np.dot(O[k], G)
 
-                    g.grasp_pose = deepcopy(o[k])
+                    grasp = deepcopy(o[k])
 
-                    g.grasp_pose.pose.position.x = T[0,3] +x
-                    g.grasp_pose.pose.position.y = T[1,3]
-                    g.grasp_pose.pose.position.z = T[2,3] 
+                    grasp.pose.position.x = T[0,3] +x
+                    grasp.pose.position.y = T[1,3]
+                    grasp.pose.position.z = T[2,3] 
 
                     quat = transformations.quaternion_from_matrix(T)
-                    g.grasp_pose.pose.orientation.x = quat[0]
-                    g.grasp_pose.pose.orientation.y = quat[1]
-                    g.grasp_pose.pose.orientation.z = quat[2]
-                    g.grasp_pose.pose.orientation.w = quat[3]
-                    g.grasp_pose.header.frame_id = REFERENCE_FRAME
-
-                    g.id = str(len(grasps))
-                    g.allowed_touch_objects = ato
+                    grasp.pose.orientation.x = quat[0]
+                    grasp.pose.orientation.y = quat[1]
+                    grasp.pose.orientation.z = quat[2]
+                    grasp.pose.orientation.w = quat[3]
+                    grasp.header.frame_id = REFERENCE_FRAME
 
                     # Append the grasp to the list
-                    grasps.append(deepcopy(g))
+                    grasps.append(deepcopy(grasp))
             else:
-                for y in self.drange(-target_size[1]/2, target_size[1]/2, 0.01):
+                for y in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.01):
 #                    print z
 
                     T = np.dot(O[k], G)
 
-                    g.grasp_pose = deepcopy(o[k])
+                    grasp = deepcopy(o[k])
 
-                    g.grasp_pose.pose.position.x = T[0,3] 
-                    g.grasp_pose.pose.position.y = T[1,3] +y
-                    g.grasp_pose.pose.position.z = T[2,3] 
+                    grasp.pose.position.x = T[0,3] 
+                    grasp.pose.position.y = T[1,3] +y
+                    grasp.pose.position.z = T[2,3] 
 
                     quat = transformations.quaternion_from_matrix(T)
-                    g.grasp_pose.pose.orientation.x = quat[0]
-                    g.grasp_pose.pose.orientation.y = quat[1]
-                    g.grasp_pose.pose.orientation.z = quat[2]
-                    g.grasp_pose.pose.orientation.w = quat[3]
-                    g.grasp_pose.header.frame_id = REFERENCE_FRAME
-
-                    g.id = str(len(grasps))
-                    g.allowed_touch_objects = ato
+                    grasp.pose.orientation.x = quat[0]
+                    grasp.pose.orientation.y = quat[1]
+                    grasp.pose.orientation.z = quat[2]
+                    grasp.pose.orientation.w = quat[3]
+                    grasp.header.frame_id = REFERENCE_FRAME
 
                     # Append the grasp to the list
-                    grasps.append(deepcopy(g))
-
+                    grasps.append(deepcopy(grasp))
             k+=1
 
         # Return the list
         return grasps
+
+
+
+    def scene_generator(self):
+#        print "happening"
+        obj_pose =[]
+        obj_id = []
+        obj_size = []
+        bl = ['ground_plane','pr2'] 
+        global obj_pose, obj_id , obj_size
+
+        ops = PoseStamped()
+        ops.header.frame_id = REFERENCE_FRAME
+
+
+        for model_name in self.pwh.name:
+            if model_name not in bl:
+                obj_id.append(model_name)
+                ops.pose = self.pwh.pose[self.pwh.name.index(model_name)]
+                obj_pose.append(deepcopy(ops))
+                obj_size.append([0.05, 0.05, 0.15])
+
+
+        obj_id[obj_id.index('custom_1')] = 'target'
+        obj_size[obj_id.index('custom_2')] = [0.05, 0.05, 0.10]
+        obj_size[obj_id.index('custom_3')] = [0.05, 0.05, 0.05]
+        obj_size[obj_id.index('custom_table')] = [1.5, 0.8, 0.03]
+
+
+
+        if self.aro is None:
+            for i in range(0, len(obj_id)):
+                ### CREATE THE SCENE ###
+                self.scene.add_box(obj_id[i], obj_pose[i], obj_size[i])
+                self.setColor(obj_id[i], 1, 0.623, 0, 1.0)
+
+            ### Make the target purple and table green ###
+            self.setColor(obj_id[obj_id.index('target')], 0.6, 0, 1, 1.0)
+            self.setColor(obj_id[obj_id.index('custom_table')], 0.3, 1, 0.3, 1.0)
+
+            self.scene.remove_attached_object(GRIPPER_FRAME)
+
+
+            # Send the colors to the planning scene
+            self.sendColors()
+
+        else:
+            if self.flag == 0:
+                touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link', 'r_wrist_roll_link', 'r_upper_arm_link']
+                #print touch_links
+                self.scene.attach_box(GRIPPER_FRAME, obj_id[self.aro], obj_pose[self.aro], obj_size[self.aro], touch_links)
+
+                ### REMOVE SPECIFIC OBJECT AFTER IT HAS BEEN ATTACHED TO GRIPPER ###
+                self.scene.remove_world_object(obj_id[self.aro])
+                self.flag +=1 
+
+
+
+
+        threading.Timer(0.5, self.scene_generator).start()
+
+
+
+
+    def model_state_callback(self,msg):
+
+        self.pwh = ModelStates()
+        self.pwh = msg
+
+    def bl(self):
+        blist = ['target','custom_2','custom_3', 'custom_table'] 
+        self.blist = []
+        for name in obj_id:
+            if name not in blist:
+                self.blist.append(obj_id.index(name))
+                # Remove any attached objects from a previous session
+                self.scene.remove_attached_object(GRIPPER_FRAME, obj_id[obj_id.index(name)])
+
+        return self.blist
 
     def drange(self, start, stop, step):
         r = start
@@ -481,20 +661,9 @@ class MoveItDemo:
             yield r
             r += step
 
-
-    def plan_exec(self, pose):
-
-        self.right_arm.clear_pose_targets()
-        self.right_arm.set_pose_target(pose, GRIPPER_FRAME)
-        self.right_arm.plan()
-        rospy.sleep(5)
-        self.right_arm.go(wait=True)
-
-
-
     def close_gripper(self):
 
-        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.035, 100))
+        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.047, 100))
         self.ac.send_goal(g_close)
         self.ac.wait_for_result()
         rospy.sleep(15) # Gazebo requires up to 15 seconds to attach object
@@ -502,74 +671,11 @@ class MoveItDemo:
 
     def open_gripper(self):
 
-        g_open = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.088, 100))
+        g_open = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.0899, 100))
         self.ac.send_goal(g_open)
         self.ac.wait_for_result()
         rospy.sleep(5) # And up to 20 to detach it
 
-
-    def scene_generator(self):
-#        print obj_att
-        global target_pose
-        global target_id
-        global target_size
-
-        next_call = time.time()
-        while True:
-            next_call = next_call+1
-            target_id = 'target'
-            self.taid = self.pwh.name.index('custom_0')
-            table_id = 'table'
-            self.tid = self.pwh.name.index('table') 
-            obstacle1_id = 'obstacle1'
-            self.o1id = self.pwh.name.index('custom_1')
-            obstacle2_id = 'obstacle2'
-            self.o2id = self.pwh.name.index('custom_2')
-
-            # Set the sizes [l, w, h]
-            table_size = [1.5, 0.8, 0.03]
-            target_size = [0.025, 0.025, 0.15]
-            obstacle1_size = [0.05, 0.05, 0.15]
-            obstacle2_size = [0.05, 0.05, 0.10]
-
-            ## Set the target pose on the table
-            target_pose = PoseStamped()
-            target_pose.header.frame_id = REFERENCE_FRAME
-            target_pose.pose = self.pwh.pose[self.taid]
-            if self.obj_att is None:
-                # Add the target object to the scene
-                self.scene.add_box(target_id, target_pose, target_size)
-
-                table_pose = PoseStamped()
-                table_pose.header.frame_id = REFERENCE_FRAME
-                table_pose.pose = self.pwh.pose[self.tid]
-                table_pose.pose.position.z += 1
-                self.scene.add_box(table_id, table_pose, table_size)
-                
-                obstacle1_pose = PoseStamped()
-                obstacle1_pose.header.frame_id = REFERENCE_FRAME
-                obstacle1_pose.pose = self.pwh.pose[self.o1id]
-                # Add the target object to the scene 
-                self.scene.add_box(obstacle1_id, obstacle1_pose, obstacle1_size)
-
-                obstacle2_pose = PoseStamped()
-                obstacle2_pose.header.frame_id = REFERENCE_FRAME
-                obstacle2_pose.pose = self.pwh.pose[self.o2id]
-                # Add the target object to the scene 
-                self.scene.add_box(obstacle2_id, obstacle2_pose, obstacle2_size)
-
-                ### Make the target purple and obstacles orange ###
-                self.setColor(target_id, 0.6, 0, 1, 1.0)
-                self.setColor(obstacle1_id, 1, 0.623, 0, 1.0)
-                self.setColor(obstacle2_id, 1, 0.623, 0, 1.0)
-
-                # Send the colors to the planning scene
-                self.sendColors()
-            else: 
-                self.scene.remove_world_object('target')
-
-            time.sleep(next_call - time.time())
-        #threading.Timer(0.5, self.scene_generator).start()
 
     # Set the color of an object
     def setColor(self, name, r, g, b, a = 0.9):
@@ -602,6 +708,39 @@ class MoveItDemo:
 
         # Publish the scene diff
         self.scene_pub.publish(p)
+
+    def lasp(self):
+
+        sp = PoseStamped()
+        sp.header.frame_id = REFERENCE_FRAME
+
+        sp.pose.position.x = 0.3665 
+        sp.pose.position.y = 0.74094
+        sp.pose.position.z = 1.1449
+        sp.pose.orientation.x = 0.80503 
+        sp.pose.orientation.y =  -0.18319
+        sp.pose.orientation.z = 0.31988
+        sp.pose.orientation.w =  0.46481
+
+        self.left_arm.plan(sp)
+        self.left_arm.go(wait=True)
+
+    def rasp(self):
+
+        sp = PoseStamped()
+        sp.header.frame_id = REFERENCE_FRAME
+
+        sp.pose.position.x = 0.7549
+        sp.pose.position.y = -0.18871
+        sp.pose.position.z = 0.89892
+        sp.pose.orientation.x = 0.00073765
+        sp.pose.orientation.y =  -0.36864
+        sp.pose.orientation.z = -0.00011228
+        sp.pose.orientation.w =   0.92957
+
+        self.right_arm.plan(sp)
+        self.right_arm.go(wait=True)
+
 
 if __name__ == "__main__":
     MoveItDemo()

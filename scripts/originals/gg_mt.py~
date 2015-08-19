@@ -141,10 +141,9 @@ class MoveItDemo:
         while success == False:
             idx = self.idx_list[i]
             print idx
-            self.aro = obj_id[idx]
-#            new_pose, ds = self.declutter_scene(idx)
-#            if ds == True:
-#                self.post_grasp(new_pose, obj_id[idx])
+            new_pose, ds = self.declutter_scene(idx)
+            if ds == True:
+                self.post_grasp(new_pose, obj_id[idx])
 
 
             i+=1 
