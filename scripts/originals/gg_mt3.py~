@@ -144,7 +144,7 @@ class MoveItDemo:
 
             else:
                 idx = self.idx_list[0]
-                n_pose, ds = self.declutter_scene(idx)
+                ds = self.declutter_scene(idx)
                 print ("DS Returns:", ds)
 
                 if ds == True:
@@ -248,9 +248,8 @@ class MoveItDemo:
                 self.right_arm.go()
                 print "Grasping"
                 success = True
-                new_pose = gr
                 break
-        return (new_pose,success)
+        return success
 
     def place_object(self, obj_idx):
 
@@ -277,9 +276,13 @@ class MoveItDemo:
             self.right_arm.plan(plpl)
             self.right_arm.go(wait=True)
 
-
+            ### INFORM SCENE ###
             self.open_gripper()
             self.aro = None
+
+            ### RETURN HAND TO STARTING POSITION ###
+            self.rasp()
+
             break
 
 
@@ -529,8 +532,8 @@ class MoveItDemo:
                     grasps.append(deepcopy(grasp))
 
 
-            elif k == 3:
-                for x in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.01):
+            elif k == 4:
+                for x in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.02):
 #                    print z
 
                     T = np.dot(O[k], G)
@@ -551,7 +554,7 @@ class MoveItDemo:
                     # Append the grasp to the list
                     grasps.append(deepcopy(grasp))
             else:
-                for y in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.01):
+                for y in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.02):
 #                    print z
 
                     T = np.dot(O[k], G)
@@ -730,13 +733,13 @@ class MoveItDemo:
         sp = PoseStamped()
         sp.header.frame_id = REFERENCE_FRAME
 
-        sp.pose.position.x = 0.7549
-        sp.pose.position.y = -0.18871
-        sp.pose.position.z = 0.89892
-        sp.pose.orientation.x = 0.00073765
-        sp.pose.orientation.y =  -0.36864
-        sp.pose.orientation.z = -0.00011228
-        sp.pose.orientation.w =   0.92957
+        sp.pose.position.x = 0.75312
+        sp.pose.position.y = -0.18966
+        sp.pose.position.z =  0.89921
+        sp.pose.orientation.x = 0.00063066
+        sp.pose.orientation.y =  -0.36882
+        sp.pose.orientation.z =   -0.00013343
+        sp.pose.orientation.w =  0.9295
 
         self.right_arm.plan(sp)
         self.right_arm.go(wait=True)
