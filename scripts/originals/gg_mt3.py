@@ -120,35 +120,40 @@ class MoveItDemo:
         ################################## GRASP EXECUTION #####################################
         print "==================== Executing ==========================="
 
+
+        start_time = time.time()
+
+
         ### PERSONAL REMINDER!!! WHAT IS WHAT!!! ###
 #        print obj_id[obj_id.index('target')]
 #        print obj_id.index('target')
 
 
-
-        ### Give the arms starting positions ###
-
+        ### MOVE LEFT ARM OUT OF THE WAY ###
         self.lasp()
-#        self.rasp()
 
 
         success = False
         while success == False and len(self.idx_list)>0:
 
-            success = self.grasp_attempt()
+
+
+            success, pgr_target = self.grasp_attempt()
             print ("GA Returns:", success)
             if success is not False:
                 self.flag = 0 # To let the planning scene know when to remove the object
+                self.post_grasp(pgr_target, obj_id.index('target'),'true')
                 self.place_object(obj_id.index('target'))
                 break
 
             else:
                 idx = self.idx_list[0]
-                ds = self.declutter_scene(idx)
+                ds, pgr_col_obj = self.declutter_scene(idx)
                 print ("DS Returns:", ds)
 
                 if ds == True:
                     self.flag = 0 # To let the planning scene know when to remove the object
+                    self.post_grasp(pgr_col_obj, obj_id.index(obj_id[idx]),'true')
                     self.place_object(obj_id.index(obj_id[idx]))
 
 
@@ -156,7 +161,7 @@ class MoveItDemo:
 
 
         print "==================== THE END! ======================"
-
+        print("--- %s seconds ---" % (time.time() - start_time))
         rospy.sleep(5)
 
 #        # Shut down MoveIt cleanly
@@ -172,10 +177,13 @@ class MoveItDemo:
 
     def grasp_attempt(self):
 
-
+        retreat = None
         init_poses = []
         grasp_poses = []
         for axis in range(0,6):
+#            while obj_id[obj_id.index('target')] is not 'target':
+#                print '!!!!!'
+#                rospy.sleep(0.05)
             pg = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'pg')
             gp = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'gp')
             init_poses.append(pg)
@@ -204,15 +212,16 @@ class MoveItDemo:
             plg = self.right_arm.plan(gr.pose)
             if len(plg.joint_trajectory.points) >= 10:
                 success = True
+                retreat = gr
                 print "Grasping"
                 break
 
-        return success
+        return success , retreat
 
 
     def declutter_scene(self,index):
 
-
+        retreat = None
         init_poses = []
         grasp_poses = []
         for axis in range(0,6):
@@ -230,7 +239,7 @@ class MoveItDemo:
         success = False
         i= 1
         for pg, gr in izip(pre_grasps, grasps):
-            print (" DC Attempt: ", i)
+            print (" DS Attempt: ", i)
             plp = self.right_arm.plan(pg.pose)
             self.gripper_pose_pub.publish(gr)
             self.right_arm.plan(pg.pose)
@@ -248,17 +257,14 @@ class MoveItDemo:
                 self.right_arm.go()
                 print "Grasping"
                 success = True
+                retreat = gr
                 break
-        return success
+        return success, retreat
 
     def place_object(self, obj_idx):
 
 
-        ######### GRASP OBJECT/ REMOVE FROM SCENE ######.
-
-        self.close_gripper()
         self.aro = obj_idx
-        rospy.sleep(5)
 
         ### GENERATE PLACE POSES ###
         places = self.place_generator()
@@ -279,19 +285,28 @@ class MoveItDemo:
 
 
             ### INFORM SCENE ###
-            self.open_gripper()
-            self.aro = None
+#            self.open_gripper()
+#            self.aro = None
 
             ### RETURN HAND TO STARTING POSITION ###
-            self.post_grasp(place)
+            self.post_grasp(place,obj_idx, 'false')
             self.rasp()
 
             break
 
 
 
-    def post_grasp(self,new_pose):
+    def post_grasp(self,new_pose, obj_idx, fl):
 
+        ######### GRASP OBJECT/ REMOVE FROM SCENE ######.
+
+        if fl == 'true':
+            self.close_gripper()
+            self.aro = obj_idx
+        else:
+            self.open_gripper()
+            self.aro = None
+        rospy.sleep(2)
 
         ### POST GRASP RETREAT ###
         M1 = transformations.quaternion_matrix([new_pose.pose.orientation.x, new_pose.pose.orientation.y, new_pose.pose.orientation.z, new_pose.pose.orientation.w])
@@ -502,7 +517,7 @@ class MoveItDemo:
             O[k][2,3] = o[k].pose.position.z
 
             if k in range(0,4):
-                for z in self.drange(0.05-obj_size[obj_id.index('target')][2]/2.5, obj_size[obj_id.index('target')][2]/2, 0.03):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
+                for z in self.drange(0.05-obj_size[obj_id.index('target')][2]/2, obj_size[obj_id.index('target')][2]/2, 0.02):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
 #                    print z
 
                     T = np.dot(O[k], G)
@@ -725,13 +740,13 @@ class MoveItDemo:
         sp = PoseStamped()
         sp.header.frame_id = REFERENCE_FRAME
 
-        sp.pose.position.x = 0.62069
-        sp.pose.position.y = -0.18984
-        sp.pose.position.z = 1.0388
-        sp.pose.orientation.x =0.00056925
-        sp.pose.orientation.y =  -0.36999
-        sp.pose.orientation.z = -0.00018164
-        sp.pose.orientation.w =   0.92904
+        sp.pose.position.x = 0.39571
+        sp.pose.position.y = -0.40201
+        sp.pose.position.z = 1.1128
+        sp.pose.orientation.x =0.00044829
+        sp.pose.orientation.y =  0.57956
+        sp.pose.orientation.z = 9.4878e-05
+        sp.pose.orientation.w = 0.81493
 
         self.right_arm.plan(sp)
         self.right_arm.go(wait=True)
