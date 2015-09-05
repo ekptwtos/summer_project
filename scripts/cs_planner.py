@@ -107,8 +107,14 @@ class MoveItDemo:
         ### Attach / Remove Object Flag ###
         self.aro = None
 
-        # Run and keep in the BG the scene generator ### TODO: Add the ability to kill the code with ctrl^c
-        self.scene_generator()
+        # Run and keep in the BG the scene generator with ctrl^c kill ### 
+        timerThread = threading.Thread(target=self.scene_generator)
+        timerThread.daemon = True
+        timerThread.start()
+        ## Give some time to ensure the thread starts!! ##
+        rospy.sleep(5)
+
+
 
         ### GENERATE THE BLACKLIST AND REMOVE ATTACHED OBJECTS FROM PREVIOUS RUNS ###
         self.idx_list = self.bl()
@@ -189,7 +195,7 @@ class MoveItDemo:
             init_poses.append(pg)
             grasp_poses.append(gp)
 
-        pre_grasps = self.grasp_generator(grasp_poses)
+        pre_grasps = self.grasp_generator(init_poses)
         grasps = self.grasp_generator(grasp_poses)
         for grasp in grasps:
             self.gripper_pose_pub.publish(grasp)
@@ -211,6 +217,7 @@ class MoveItDemo:
             rospy.sleep(5)
             plg = self.right_arm.plan(gr.pose)
             if len(plg.joint_trajectory.points) >= 10:
+                self.right_arm.go()
                 success = True
                 retreat = gr
                 print "Grasping"
@@ -230,7 +237,7 @@ class MoveItDemo:
             init_poses.append(pg)
             grasp_poses.append(gp)
 
-        pre_grasps = self.grasp_generator(grasp_poses)
+        pre_grasps = self.grasp_generator(init_poses)
         grasps = self.grasp_generator(grasp_poses)
         for grasp in grasps:
             self.gripper_pose_pub.publish(grasp)
@@ -589,62 +596,60 @@ class MoveItDemo:
 
 
     def scene_generator(self):
-#        print "happening"
-        obj_pose =[]
-        obj_id = []
-        obj_size = []
-        bl = ['ground_plane','pr2'] 
-        global obj_pose, obj_id , obj_size
+        while True:
+#            print "happening"
+            obj_pose =[]
+            obj_id = []
+            obj_size = []
+            bl = ['ground_plane','pr2'] 
+            global obj_pose, obj_id , obj_size
 
-        ops = PoseStamped()
-        ops.header.frame_id = REFERENCE_FRAME
-
-
-        for model_name in self.pwh.name:
-            if model_name not in bl:
-                obj_id.append(model_name)
-                ops.pose = self.pwh.pose[self.pwh.name.index(model_name)]
-                obj_pose.append(deepcopy(ops))
-                obj_size.append([0.05, 0.05, 0.15])
+            ops = PoseStamped()
+            ops.header.frame_id = REFERENCE_FRAME
 
 
-        obj_id[obj_id.index('custom_1')] = 'target'
-        obj_size[obj_id.index('custom_2')] = [0.05, 0.05, 0.10]
-        obj_size[obj_id.index('custom_3')] = [0.05, 0.05, 0.05]
-        obj_size[obj_id.index('custom_table')] = [1.5, 0.8, 0.03]
+            for model_name in self.pwh.name:
+                if model_name not in bl:
+                    obj_id.append(model_name)
+                    ops.pose = self.pwh.pose[self.pwh.name.index(model_name)]
+                    obj_pose.append(deepcopy(ops))
+                    obj_size.append([0.05, 0.05, 0.15])
 
 
-
-        if self.aro is None:
-            for i in range(0, len(obj_id)):
-                ### CREATE THE SCENE ###
-                self.scene.add_box(obj_id[i], obj_pose[i], obj_size[i])
-                self.setColor(obj_id[i], 1, 0.623, 0, 1.0)
-
-            ### Make the target purple and table green ###
-            self.setColor(obj_id[obj_id.index('target')], 0.6, 0, 1, 1.0)
-            self.setColor(obj_id[obj_id.index('custom_table')], 0.3, 1, 0.3, 1.0)
-
-            self.scene.remove_attached_object(GRIPPER_FRAME)
-
-
-            # Send the colors to the planning scene
-            self.sendColors()
-
-        else:
-            if self.flag == 0:
-                touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link', 'r_wrist_roll_link', 'r_upper_arm_link']
-                #print touch_links
-                self.scene.attach_box(GRIPPER_FRAME, obj_id[self.aro], obj_pose[self.aro], obj_size[self.aro], touch_links)
-
-                ### REMOVE SPECIFIC OBJECT AFTER IT HAS BEEN ATTACHED TO GRIPPER ###
-                self.scene.remove_world_object(obj_id[self.aro])
-                self.flag +=1 
+            obj_id[obj_id.index('custom_1')] = 'target'
+            obj_size[obj_id.index('custom_2')] = [0.05, 0.05, 0.10]
+            obj_size[obj_id.index('custom_3')] = [0.05, 0.05, 0.05]
+            obj_size[obj_id.index('custom_table')] = [1.5, 0.8, 0.03]
 
 
 
+            if self.aro is None:
+                for i in range(0, len(obj_id)):
+                    ### CREATE THE SCENE ###
+                    self.scene.add_box(obj_id[i], obj_pose[i], obj_size[i])
+                    self.setColor(obj_id[i], 1, 0.623, 0, 1.0)
 
-        threading.Timer(0.5, self.scene_generator).start()
+                ### Make the target purple and table green ###
+                self.setColor(obj_id[obj_id.index('target')], 0.6, 0, 1, 1.0)
+                self.setColor(obj_id[obj_id.index('custom_table')], 0.3, 1, 0.3, 1.0)
+
+                self.scene.remove_attached_object(GRIPPER_FRAME)
+
+
+                # Send the colors to the planning scene
+                self.sendColors()
+
+            else:
+                if self.flag == 0:
+                    touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link', 'r_wrist_roll_link', 'r_upper_arm_link']
+                    #print touch_links
+                    self.scene.attach_box(GRIPPER_FRAME, obj_id[self.aro], obj_pose[self.aro], obj_size[self.aro], touch_links)
+
+                    ### REMOVE SPECIFIC OBJECT AFTER IT HAS BEEN ATTACHED TO GRIPPER ###
+                    self.scene.remove_world_object(obj_id[self.aro])
+                    self.flag +=1 
+
+            time.sleep(0.5)
 
 
 

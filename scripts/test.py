@@ -108,23 +108,16 @@ class MoveItDemo:
         ### Attach / Remove Object Flag ###
         self.aro = None
 
-#        # Run and keep in the BG the scene generator + Daemon to kill with ctrl^c ###
-
-
-        timerThread = threading.Thread(target=self.scene_generator)
-        timerThread.daemon = True
-        timerThread.start()
-        ## Give some time to ensure the thread starts!! ##
-        rospy.sleep(5)
+        # Run and keep in the BG the scene generator ### TODO: Add the ability to kill the code with ctrl^c
+        self.scene_generator()
 
         ### GENERATE THE BLACKLIST AND REMOVE ATTACHED OBJECTS FROM PREVIOUS RUNS ###
         self.idx_list = self.bl()
 
-        ### SORT LIST IN ASCENDING ORDER (DEPENDS ON OBJECTS DISTANCE TO TARGET) ###
         self.s_idx_list = self.sort_list(self.idx_list)
 
         ### GIVE SCENE TIME TO CATCH UP ###
-        rospy.sleep(2)
+        rospy.sleep(5)
 
 
         ################################## GRASP EXECUTION #####################################
@@ -132,6 +125,69 @@ class MoveItDemo:
 
 
         start_time = time.time()
+
+        ################################## TESTING AREA #####################################
+
+
+        retreat = None
+        init_poses = []
+        grasp_poses = []
+        for axis in range(0,6):
+#            while obj_id[obj_id.index('target')] is not 'target':
+#                print '!!!!!'
+#                rospy.sleep(0.05)
+            pg = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'pg')
+            gp = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'gp')
+            init_poses.append(pg)
+            grasp_poses.append(gp)
+
+        pre_grasps = self.grasp_generator(init_poses, 1)
+        grasps = self.grasp_generator(grasp_poses, 1)
+#        for grasp in pre_grasps:
+#            self.gripper_pose_pub.publish(grasp)
+#            rospy.sleep(0.05)
+
+
+        pgp = pre_grasps[27].pose
+        self.gripper_pose_pub.publish(pre_grasps[27])
+#        pgp.position.x -= 0.05
+        self.right_arm.plan(pgp)
+        self.right_arm.go()
+        rospy.sleep(5)
+#        success = False
+#        i = 0
+#        for pg, gr in izip(pre_grasps, grasps):
+#            print ("G Attempt: ", i+1)
+#            if i == 0:
+#                self.right_arm.plan(pre_grasps[2].pose)
+#                self.right_arm.go(wait=True)
+    #            self.gripper_pose_pub.publish(gr)
+    #            plp = self.right_arm.plan(pg.pose)
+    #            self.right_arm.plan(pg.pose)
+
+    #            if len(plp.joint_trajectory.points) == 0:
+    #                print "No valid pregrasp Position, continuing on next one"
+    #                i+=1
+    #                continue
+
+    #            self.right_arm.plan(pg.pose)
+    #            self.right_arm.go(wait=True)
+    #            rospy.sleep(5)
+    #            plg = self.right_arm.plan(gr.pose)
+    #            if len(plg.joint_trajectory.points) >= 10:
+    #                success = True
+    #                retreat = gr
+    #                print "Grasping"
+    #                break
+
+
+        ################ END OF TESTING AREA #################
+
+
+
+
+
+
 
         ### PERSONAL REMINDER!!! WHAT IS WHAT!!! ###
 #        print obj_id[obj_id.index('target')]
@@ -146,36 +202,36 @@ class MoveItDemo:
 #        print self.s_idx_list
 
         ### MOVE LEFT ARM OUT OF THE WAY ###
-        self.lasp()
+#        self.lasp()
 #        self.rasp()
 
-        success = False
-        target_attempts = 0
-        while success == False and len(self.s_idx_list)>0:
-
-            if len(self.s_idx_list)==0:
-                target_attempts = 1
-
-            success, pgr_target = self.grasp_attempt(target_attempts)
-            print ("GA Returns:", success)
-            if success is not False:
-                self.flag = 0 # To let the planning scene know when to remove the object
-                self.post_grasp(pgr_target, obj_id.index('target'),'true')
-                self.place_object(obj_id.index('target'))
-                break
-
-            else:
-                idx = self.s_idx_list[0]
-                ds, pgr_col_obj = self.declutter_scene(idx, target_attempts)
-                print ("DS Returns:", ds)
-
-                if ds == True:
-                    self.flag = 0 # To let the planning scene know when to remove the object
-                    self.post_grasp(pgr_col_obj, obj_id.index(obj_id[idx]),'true')
-                    self.place_object(obj_id.index(obj_id[idx]))
+#        success = False
+#        target_attempts = 0
+#        while success == False and len(self.s_idx_list)>0:
 
 
-                self.s_idx_list.pop(0) 
+
+#            success, pgr_target = self.grasp_attempt(target_attempts)
+#            print ("GA Returns:", success)
+#            if success is not False:
+#                self.flag = 0 # To let the planning scene know when to remove the object
+#                self.post_grasp(pgr_target, obj_id.index('target'),'true')
+#                self.place_object(obj_id.index('target'))
+#                break
+
+#            else:
+#                target_attempts +=1
+#                idx = self.s_idx_list[0]
+#                ds, pgr_col_obj = self.declutter_scene(idx, target_attempts)
+#                print ("DS Returns:", ds)
+
+#                if ds == True:
+#                    self.flag = 0 # To let the planning scene know when to remove the object
+#                    self.post_grasp(pgr_col_obj, obj_id.index(obj_id[idx]),'true')
+#                    self.place_object(obj_id.index(obj_id[idx]))
+
+
+#                self.s_idx_list.pop(0) 
 
 
         print "==================== THE END! ======================"
@@ -207,16 +263,17 @@ class MoveItDemo:
             init_poses.append(pg)
             grasp_poses.append(gp)
 
-        pre_grasps = self.grasp_generator(init_poses, tar_att)
+        pre_grasps = self.grasp_generator(grasp_poses, tar_att)
         grasps = self.grasp_generator(grasp_poses, tar_att)
         for grasp in grasps:
             self.gripper_pose_pub.publish(grasp)
             rospy.sleep(0.05)
 
         success = False
-        i = 1
+        i = 0
         for pg, gr in izip(pre_grasps, grasps):
-            print ("G Attempt: ", i)
+            print ("G Attempt: ", i+1)
+
             self.gripper_pose_pub.publish(gr)
             plp = self.right_arm.plan(pg.pose)
             self.right_arm.plan(pg.pose)
@@ -231,7 +288,6 @@ class MoveItDemo:
             rospy.sleep(5)
             plg = self.right_arm.plan(gr.pose)
             if len(plg.joint_trajectory.points) >= 10:
-                self.right_arm.go()
                 success = True
                 retreat = gr
                 print "Grasping"
@@ -251,7 +307,7 @@ class MoveItDemo:
             init_poses.append(pg)
             grasp_poses.append(gp)
 
-        pre_grasps = self.grasp_generator(init_poses, tar_att)
+        pre_grasps = self.grasp_generator(grasp_poses, tar_att)
         grasps = self.grasp_generator(grasp_poses, tar_att)
         for grasp in grasps:
             self.gripper_pose_pub.publish(grasp)
@@ -518,8 +574,8 @@ class MoveItDemo:
         grasps = []
         o = []        # Original Pose of the object (o)
         O=[]
-        z_vals = [-0.07, 0. 0.07]
-
+        z_vals = [-0.07, 0, 0.07]
+        
 
         i= 0
         while i < len(initial_poses):
@@ -541,8 +597,7 @@ class MoveItDemo:
 
             if k in range(0,4):
                 if attempt == 0:
-                    for z in z_vals:  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
-    #                    print z
+                    for z in z_vals:
 
                         T = np.dot(O[k], G)
 
@@ -561,10 +616,9 @@ class MoveItDemo:
 
                         # Append the grasp to the list
                         grasps.append(deepcopy(grasp))
-
                 else:
                     for z in self.drange(0.05-obj_size[obj_id.index('target')][2]/2, obj_size[obj_id.index('target')][2]/2, 0.02):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
-    #                    print z
+#                        print z
 
                         T = np.dot(O[k], G)
 
@@ -605,8 +659,8 @@ class MoveItDemo:
                     # Append the grasp to the list
                     grasps.append(deepcopy(grasp))
                 else:
-                    for x in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.02):
-    #                    print z
+                    for x in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.01):
+#                        print x
 
                         T = np.dot(O[k], G)
 
@@ -645,7 +699,7 @@ class MoveItDemo:
                     # Append the grasp to the list
                     grasps.append(deepcopy(grasp))
                 else:
-                    for y in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.02):
+                    for y in self.drange(-obj_size[obj_id.index('target')][1]/2, obj_size[obj_id.index('target')][1]/2, 0.01):
     #                    print z
 
                         T = np.dot(O[k], G)
@@ -673,63 +727,62 @@ class MoveItDemo:
 
 
     def scene_generator(self):
-        while True:
-#            print "happening"
-            obj_pose =[]
-            obj_id = []
-            obj_size = []
-            bl = ['ground_plane','pr2'] 
-            global obj_pose, obj_id , obj_size
+#        print "happening"
+        obj_pose =[]
+        obj_id = []
+        obj_size = []
+        bl = ['ground_plane','pr2'] 
+        global obj_pose, obj_id , obj_size
 
-            ops = PoseStamped()
-            ops.header.frame_id = REFERENCE_FRAME
-
-
-            for model_name in self.pwh.name:
-                if model_name not in bl:
-                    obj_id.append(model_name)
-                    ops.pose = self.pwh.pose[self.pwh.name.index(model_name)]
-                    obj_pose.append(deepcopy(ops))
-                    obj_size.append([0.05, 0.05, 0.15])
+        ops = PoseStamped()
+        ops.header.frame_id = REFERENCE_FRAME
 
 
-            obj_id[obj_id.index('custom_1')] = 'target'
-            obj_size[obj_id.index('custom_2')] = [0.05, 0.05, 0.10]
-            obj_size[obj_id.index('custom_3')] = [0.05, 0.05, 0.05]
-            obj_size[obj_id.index('custom_table')] = [1.5, 0.8, 0.03]
+        for model_name in self.pwh.name:
+            if model_name not in bl:
+                obj_id.append(model_name)
+                ops.pose = self.pwh.pose[self.pwh.name.index(model_name)]
+                obj_pose.append(deepcopy(ops))
+                obj_size.append([0.05, 0.05, 0.15])
+
+
+        obj_id[obj_id.index('custom_1')] = 'target'
+        obj_size[obj_id.index('custom_2')] = [0.05, 0.05, 0.10]
+        obj_size[obj_id.index('custom_3')] = [0.05, 0.05, 0.05]
+        obj_size[obj_id.index('custom_table')] = [1.5, 0.8, 0.03]
 
 
 
-            if self.aro is None:
-                for i in range(0, len(obj_id)):
-                    ### CREATE THE SCENE ###
-                    self.scene.add_box(obj_id[i], obj_pose[i], obj_size[i])
-                    self.setColor(obj_id[i], 1, 0.623, 0, 1.0)
+        if self.aro is None:
+            for i in range(0, len(obj_id)):
+                ### CREATE THE SCENE ###
+                self.scene.add_box(obj_id[i], obj_pose[i], obj_size[i])
+                self.setColor(obj_id[i], 1, 0.623, 0, 1.0)
 
-                ### Make the target purple and table green ###
-                self.setColor(obj_id[obj_id.index('target')], 0.6, 0, 1, 1.0)
-                self.setColor(obj_id[obj_id.index('custom_table')], 0.3, 1, 0.3, 1.0)
+            ### Make the target purple and table green ###
+            self.setColor(obj_id[obj_id.index('target')], 0.6, 0, 1, 1.0)
+            self.setColor(obj_id[obj_id.index('custom_table')], 0.3, 1, 0.3, 1.0)
 
-                self.scene.remove_attached_object(GRIPPER_FRAME)
-
-
-                # Send the colors to the planning scene
-                self.sendColors()
-
-            else:
-                if self.flag == 0:
-                    touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link', 'r_wrist_roll_link', 'r_upper_arm_link']
-                    #print touch_links
-                    self.scene.attach_box(GRIPPER_FRAME, obj_id[self.aro], obj_pose[self.aro], obj_size[self.aro], touch_links)
-
-                    ### REMOVE SPECIFIC OBJECT AFTER IT HAS BEEN ATTACHED TO GRIPPER ###
-                    self.scene.remove_world_object(obj_id[self.aro])
-                    self.flag +=1 
-
-            time.sleep(0.5)
+            self.scene.remove_attached_object(GRIPPER_FRAME)
 
 
-#        threading.Timer(0.5, self.scene_generator).start()
+            # Send the colors to the planning scene
+            self.sendColors()
+
+        else:
+            if self.flag == 0:
+                touch_links = [GRIPPER_FRAME, 'r_gripper_l_finger_tip_link','r_gripper_r_finger_tip_link', 'r_gripper_r_finger_link', 'r_gripper_l_finger_link', 'r_wrist_roll_link', 'r_upper_arm_link']
+                #print touch_links
+                self.scene.attach_box(GRIPPER_FRAME, obj_id[self.aro], obj_pose[self.aro], obj_size[self.aro], touch_links)
+
+                ### REMOVE SPECIFIC OBJECT AFTER IT HAS BEEN ATTACHED TO GRIPPER ###
+                self.scene.remove_world_object(obj_id[self.aro])
+                self.flag +=1 
+
+
+
+
+        threading.Timer(0.5, self.scene_generator).start()
 
 
 
