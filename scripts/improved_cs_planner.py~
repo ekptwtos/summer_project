@@ -518,7 +518,7 @@ class MoveItDemo:
         grasps = []
         o = []        # Original Pose of the object (o)
         O=[]
-        z_vals = [-0.07, 0. 0.07]
+        z_vals = [-0.07, 0, 0.07]
 
 
         i= 0

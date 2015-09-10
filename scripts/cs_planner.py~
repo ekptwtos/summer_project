@@ -217,6 +217,7 @@ class MoveItDemo:
             rospy.sleep(5)
             plg = self.right_arm.plan(gr.pose)
             if len(plg.joint_trajectory.points) >= 10:
+                self.right_arm.go()
                 success = True
                 retreat = gr
                 print "Grasping"

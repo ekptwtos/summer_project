@@ -616,7 +616,7 @@ class MoveItDemo:
                     obj_size.append([0.05, 0.05, 0.15])
 
 
-            obj_id[obj_id.index('custom_1')] = 'target'
+#            obj_id[obj_id.index('custom_1')] = 'target'
             obj_size[obj_id.index('custom_2')] = [0.05, 0.05, 0.10]
             obj_size[obj_id.index('custom_3')] = [0.05, 0.05, 0.05]
             obj_size[obj_id.index('custom_table')] = [1.5, 0.8, 0.03]
