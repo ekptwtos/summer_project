@@ -195,6 +195,8 @@ class MoveItDemo:
 
     def grasp_attempt(self, tar_att):
 
+#        start_time = time.time()
+
         retreat = None
         init_poses = []
         grasp_poses = []
@@ -219,7 +221,6 @@ class MoveItDemo:
             print ("G Attempt: ", i)
             self.gripper_pose_pub.publish(gr)
             plp = self.right_arm.plan(pg.pose)
-            self.right_arm.plan(pg.pose)
 
             if len(plp.joint_trajectory.points) == 0:
                 print "No valid pregrasp Position, continuing on next one"
@@ -237,6 +238,7 @@ class MoveItDemo:
                 print "Grasping"
                 break
 
+#        print("--- %s seconds ---" % (time.time() - start_time))
         return success , retreat
 
 
@@ -518,7 +520,7 @@ class MoveItDemo:
         grasps = []
         o = []        # Original Pose of the object (o)
         O=[]
-        z_vals = [-0.07, 0, 0.07]
+        z_vals = [-0.065, 0, 0.065]
 
 
         i= 0
@@ -748,6 +750,7 @@ class MoveItDemo:
                 # Remove any attached objects from a previous session
                 self.scene.remove_attached_object(GRIPPER_FRAME, obj_id[obj_id.index(name)])
 
+        self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
         return self.blist
 
     def sort_list(self, the_list):

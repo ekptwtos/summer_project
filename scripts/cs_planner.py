@@ -183,6 +183,8 @@ class MoveItDemo:
 
     def grasp_attempt(self):
 
+#        start_time = time.time()
+
         retreat = None
         init_poses = []
         grasp_poses = []
@@ -223,6 +225,7 @@ class MoveItDemo:
                 print "Grasping"
                 break
 
+#        print("--- %s seconds ---" % (time.time() - start_time))
         return success , retreat
 
 
@@ -668,6 +671,7 @@ class MoveItDemo:
                 # Remove any attached objects from a previous session
                 self.scene.remove_attached_object(GRIPPER_FRAME, obj_id[obj_id.index(name)])
 
+        self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
         return self.blist
 
     def drange(self, start, stop, step):
