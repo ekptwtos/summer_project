@@ -137,21 +137,28 @@ class MoveItDemo:
 #        print obj_id[obj_id.index('target')]
 #        print obj_id.index('target')
 #        print obj_id[0]
-#        print obj_pose[obj_id.index('target')]
+#        print obj_pose[obj_id.index('target')].pose.position.z
 #        print "--------------------------------"
+#        print obj_pose[obj_id.index('custom_1_6')]
+#        print "--------------------------------"
+#        print obj_pose[obj_id.index('custom_1_7')]
 #        print obj_pose[obj_id.index('target')].pose.position.x
-
-
 #        print self.idx_list
 #        print self.s_idx_list
+#        eul = [obj_pose[obj_id.index('target')].pose.orientation.x, obj_pose[obj_id.index('target')].pose.orientation.y, obj_pose[obj_id.index('target')].pose.orientation.z, obj_pose[obj_id.index('target')].pose.orientation.w]
+#        e1 = transformations.euler_from_quaternion(eul)
+#        print e1
+
+
 
         ### MOVE LEFT ARM OUT OF THE WAY ###
         self.lasp()
-#        self.rasp()
 
+
+        list_counter = len(self.s_idx_list)
         success = False
         target_attempts = 0
-        while success == False and len(self.s_idx_list)>0:
+        while success == False and list_counter>=0:
 
             if len(self.s_idx_list)==0:
                 target_attempts = 1
@@ -166,7 +173,7 @@ class MoveItDemo:
 
             else:
                 idx = self.s_idx_list[0]
-                ds, pgr_col_obj = self.declutter_scene(idx, target_attempts)
+                ds, pgr_col_obj = self.declutter_scene(idx, 1)
                 print ("DS Returns:", ds)
 
                 if ds == True:
@@ -174,7 +181,7 @@ class MoveItDemo:
                     self.post_grasp(pgr_col_obj, obj_id.index(obj_id[idx]),'true')
                     self.place_object(obj_id.index(obj_id[idx]))
 
-
+                list_counter-=1
                 self.s_idx_list.pop(0) 
 
 
@@ -201,9 +208,7 @@ class MoveItDemo:
         init_poses = []
         grasp_poses = []
         for axis in range(0,6):
-#            while obj_id[obj_id.index('target')] is not 'target':
-#                print '!!!!!'
-#                rospy.sleep(0.05)
+
             pg = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'pg')
             gp = self.grasp_pose(obj_pose[obj_id.index('target')], axis, 'gp')
             init_poses.append(pg)
@@ -218,8 +223,9 @@ class MoveItDemo:
         success = False
         i = 1
         for pg, gr in izip(pre_grasps, grasps):
-            print ("G Attempt: ", i)
+
             self.gripper_pose_pub.publish(gr)
+            print ("G Attempt: ", i)
             plp = self.right_arm.plan(pg.pose)
 
             if len(plp.joint_trajectory.points) == 0:
@@ -227,6 +233,7 @@ class MoveItDemo:
                 i+=1
                 continue
 
+            i+=1
             self.right_arm.plan(pg.pose)
             self.right_arm.go(wait=True)
             rospy.sleep(5)
@@ -262,9 +269,10 @@ class MoveItDemo:
         success = False
         i= 1
         for pg, gr in izip(pre_grasps, grasps):
-            print (" DS Attempt: ", i)
+
             plp = self.right_arm.plan(pg.pose)
             self.gripper_pose_pub.publish(gr)
+            print (" DS Attempt: ", i)
             self.right_arm.plan(pg.pose)
 
             if len(plp.joint_trajectory.points) == 0:
@@ -272,6 +280,7 @@ class MoveItDemo:
                 i+=1
                 continue
 
+            i+=1
             self.right_arm.plan(pg.pose)
             self.right_arm.go(wait=True)
             rospy.sleep(5)
@@ -520,8 +529,13 @@ class MoveItDemo:
         grasps = []
         o = []        # Original Pose of the object (o)
         O=[]
-        z_vals = [-0.065, 0, 0.065]
+        ipc = initial_poses[0].pose.position.z
+        qu = [initial_poses[0].pose.orientation.x, initial_poses[0].pose.orientation.y, initial_poses[0].pose.orientation.z, initial_poses[0].pose.orientation.w]
+        euler = transformations.euler_from_quaternion(qu)
+        print euler[0]
 
+        vals = [0, 0.06, -0.06]
+        n_vals = [0, 0.02, 0.04, 0.06, -0.02, -0.04, -0.06]
 
         i= 0
         while i < len(initial_poses):
@@ -531,7 +545,7 @@ class MoveItDemo:
         G = transformations.euler_matrix(0, 0, 0)
 
 
-        # Generate a grasps for along z axis (x and y directions)
+        # Generate a grasps
 
         k = 0
         while k <= 5:
@@ -543,16 +557,28 @@ class MoveItDemo:
 
             if k in range(0,4):
                 if attempt == 0:
-                    for z in z_vals:  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
+                    for v in vals: 
     #                    print z
 
                         T = np.dot(O[k], G)
 
                         grasp = deepcopy(o[k])
 
-                        grasp.pose.position.x = T[0,3]
-                        grasp.pose.position.y = T[1,3]
-                        grasp.pose.position.z = T[2,3] +z
+                        if 0.46 <= ipc <= 0.48:
+                            grasp.pose.position.x = T[0,3] 
+                            grasp.pose.position.y = T[1,3]
+                            grasp.pose.position.z = T[2,3] +v
+
+                        else:
+                            if (0.785 <= euler[0] <= 2.355) or (-2.355 <= euler[0] <= -0.785 ):
+                                grasp.pose.position.x = T[0,3] 
+                                grasp.pose.position.y = T[1,3] +v
+                                grasp.pose.position.z = T[2,3]
+                            else:
+                                grasp.pose.position.x = T[0,3] +v
+                                grasp.pose.position.y = T[1,3] 
+                                grasp.pose.position.z = T[2,3]
+
 
                         quat = transformations.quaternion_from_matrix(T)
                         grasp.pose.orientation.x = quat[0]
@@ -565,16 +591,26 @@ class MoveItDemo:
                         grasps.append(deepcopy(grasp))
 
                 else:
-                    for z in self.drange(0.05-obj_size[obj_id.index('target')][2]/2, obj_size[obj_id.index('target')][2]/2, 0.02):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
+                    for n in n_vals:  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
     #                    print z
 
                         T = np.dot(O[k], G)
 
                         grasp = deepcopy(o[k])
 
-                        grasp.pose.position.x = T[0,3]
-                        grasp.pose.position.y = T[1,3]
-                        grasp.pose.position.z = T[2,3] +z
+                        if 0.46 <= ipc <= 0.48:
+                            grasp.pose.position.x = T[0,3] 
+                            grasp.pose.position.y = T[1,3]
+                            grasp.pose.position.z = T[2,3] +n
+                        else:
+                            if (0.785 <= euler[0] <= 2.355) or (-2.355 <= euler[0] <= -0.785 ):
+                                grasp.pose.position.x = T[0,3] 
+                                grasp.pose.position.y = T[1,3] +n
+                                grasp.pose.position.z = T[2,3]
+                            else:
+                                grasp.pose.position.x = T[0,3] +n
+                                grasp.pose.position.y = T[1,3] 
+                                grasp.pose.position.z = T[2,3]
 
                         quat = transformations.quaternion_from_matrix(T)
                         grasp.pose.orientation.x = quat[0]
@@ -791,7 +827,7 @@ class MoveItDemo:
 
     def close_gripper(self):
 
-        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.047, 100))
+        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.044, 100))
         self.ac.send_goal(g_close)
         self.ac.wait_for_result()
         rospy.sleep(15) # Gazebo requires up to 15 seconds to attach object

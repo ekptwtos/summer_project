@@ -80,40 +80,40 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
     <state world_name='default'>
-      <sim_time>1700 171000000</sim_time>
-      <real_time>17 540579333</real_time>
-      <wall_time>1441899056 933099448</wall_time>
+      <sim_time>2440 558000000</sim_time>
+      <real_time>223 405322376</real_time>
+      <wall_time>1442416844 162585282</wall_time>
       <model name='custom_1_0'>
-        <pose>1.03725 -0.747425 0.074544 -2.11788e-22 0.016666 -7.6e-05</pose>
+        <pose>0.865474 -1.26699 0.024543 -1.57581 -0 -1.54922</pose>
         <link name='link'>
-          <pose>1.03725 -0.747425 0.074544 -2.11788e-22 0.016666 -7.6e-05</pose>
+          <pose>0.865474 -1.26699 0.024543 -1.57581 -0 -1.54922</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='custom_2'>
-        <pose>0.92682 -0.742095 0.049925 -0.002904 4.4e-05 0.004412</pose>
+        <pose>0.574342 -1.3137 0.049461 0 5.5e-05 -0.000108</pose>
         <link name='link'>
-          <pose>0.92682 -0.742095 0.049925 -0.002904 4.4e-05 0.004412</pose>
+          <pose>0.574342 -1.3137 0.049461 0 5.5e-05 -0.000108</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='custom_3'>
-        <pose>0.824516 -0.723422 0.024981 -3.14059 0.0017 -2.98205</pose>
+        <pose>0.455312 -1.39493 0.024461 1.98523e-23 -2e-06 -0.028035</pose>
         <link name='link'>
-          <pose>0.824516 -0.723422 0.024981 -3.14059 0.0017 -2.98205</pose>
+          <pose>0.455312 -1.39493 0.024461 1.98523e-23 -2e-06 -0.028035</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='custom_table'>
-        <pose>0.726572 0.070862 0.441163 -3.12533 0.000225 1.5819</pose>
+        <pose>0.706521 0.08117 0.378441 3.13347 0.000225 1.5819</pose>
         <link name='link'>
-          <pose>0.726572 0.070862 0.441163 -3.12533 0.000225 1.5819</pose>
+          <pose>0.706521 0.08117 0.378441 3.13347 0.000225 1.5819</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
@@ -129,10 +129,10 @@
         </link>
       </model>
       <model name='target'>
-        <pose>0.575551 -0.40871 0.533823 -0.00038 0.016251 -0.000267</pose>
+        <pose>0.571438 -0.394932 0.466866 0.006621 -0.012778 -0.000891</pose>
         <link name='link'>
-          <pose>0.575551 -0.40871 0.533823 -0.00038 0.016251 -0.000267</pose>
-          <velocity>-5e-06 -2e-05 -0 0.000261 -7.1e-05 1e-06</velocity>
+          <pose>0.571438 -0.394932 0.466866 0.006621 -0.012778 -0.000891</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
@@ -140,7 +140,7 @@
     </state>
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose>1.92997 -1.80185 1.55624 1.5028e-17 0.393795 2.48839</pose>
+        <pose>1.44427 -1.39947 1.19598 0 0.461793 2.37636</pose>
         <view_controller>orbit</view_controller>
       </camera>
     </gui>
@@ -557,7 +557,7 @@
         <kinematic>0</kinematic>
         <gravity>1</gravity>
       </link>
-      <pose>0 -1 0 0 -0 0</pose>
+      <pose>0.505044 -1 0 0 -0 0</pose>
       <static>0</static>
     </model>
   </world>

@@ -750,7 +750,7 @@ class MoveItDemo:
                 # Remove any attached objects from a previous session
                 self.scene.remove_attached_object(GRIPPER_FRAME, obj_id[obj_id.index(name)])
 
-        self.scene.remove_attatched_object(GRIPPER_FRAME, 'target')
+        self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
         return self.blist
 
     def sort_list(self, the_list):
