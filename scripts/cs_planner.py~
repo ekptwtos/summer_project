@@ -206,17 +206,19 @@ class MoveItDemo:
         success = False
         i = 1
         for pg, gr in izip(pre_grasps, grasps):
-            print ("G Attempt: ", i)
             self.gripper_pose_pub.publish(gr)
+            print ("G Attempt: ", i)
             plp = self.right_arm.plan(pg.pose)
             if len(plp.joint_trajectory.points) == 0:
                 print "No valid pregrasp Position, continuing on next one"
                 i+=1
                 continue
 
+            i+=1
             self.right_arm.plan(pg.pose)
             self.right_arm.go(wait=True)
             rospy.sleep(5)
+
             plg = self.right_arm.plan(gr.pose)
             if len(plg.joint_trajectory.points) >= 10:
                 self.right_arm.go()
@@ -249,8 +251,9 @@ class MoveItDemo:
         success = False
         i= 1
         for pg, gr in izip(pre_grasps, grasps):
-            print (" DS Attempt: ", i)
+
             plp = self.right_arm.plan(pg.pose)
+            print (" DS Attempt: ", i)
             self.gripper_pose_pub.publish(gr)
             self.right_arm.plan(pg.pose)
             if len(plp.joint_trajectory.points) == 0:
@@ -258,6 +261,7 @@ class MoveItDemo:
                 i+=1
                 continue
 
+            i+=1
             self.right_arm.plan(pg.pose)
             self.right_arm.go()
             rospy.sleep(5)
@@ -527,7 +531,7 @@ class MoveItDemo:
             O[k][2,3] = o[k].pose.position.z
 
             if k in range(0,4):
-                for z in self.drange(0.05-obj_size[obj_id.index('target')][2]/2, obj_size[obj_id.index('target')][2]/2, 0.02):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
+                for z in self.drange(0.005-obj_size[obj_id.index('target')][2]/2,-0.005 + obj_size[obj_id.index('target')][2]/2, 0.02):  ### TODO: USE EACH OBJECTS SIZE NOT ONLY THE TARGETS ###
 #                    print z
 
                     T = np.dot(O[k], G)
@@ -592,7 +596,7 @@ class MoveItDemo:
                     # Append the grasp to the list
                     grasps.append(deepcopy(grasp))
             k+=1
-
+        print len(grasps)
         # Return the list
         return grasps
 
@@ -671,7 +675,7 @@ class MoveItDemo:
                 # Remove any attached objects from a previous session
                 self.scene.remove_attached_object(GRIPPER_FRAME, obj_id[obj_id.index(name)])
 
-        self.scene.remove_attatched_object(GRIPPER_FRAME, 'target')
+        self.scene.remove_attached_object(GRIPPER_FRAME, 'target')
         return self.blist
 
     def drange(self, start, stop, step):
@@ -682,7 +686,7 @@ class MoveItDemo:
 
     def close_gripper(self):
 
-        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.047, 100))
+        g_close = pr2c.Pr2GripperCommandGoal(pr2c.Pr2GripperCommand(0.044, 100))
         self.ac.send_goal(g_close)
         self.ac.wait_for_result()
         rospy.sleep(15) # Gazebo requires up to 15 seconds to attach object

@@ -131,7 +131,7 @@ class MoveItDemo:
         print "==================== Executing ==========================="
 
 
-#        start_time = time.time()
+        start_time = time.time()
 
         ### PERSONAL REMINDER!!! WHAT IS WHAT!!! ###
 #        print obj_id[obj_id.index('target')]
@@ -163,7 +163,7 @@ class MoveItDemo:
             if len(self.s_idx_list)==0:
                 target_attempts = 1
 
-            success, pgr_target = self.grasp_attempt(1)
+            success, pgr_target = self.grasp_attempt(target_attempts)
             print ("GA Returns:", success)
             if success is not False:
                 self.flag = 0 # To let the planning scene know when to remove the object
@@ -186,7 +186,7 @@ class MoveItDemo:
 
 
         print "==================== THE END! ======================"
-#        print("--- %s seconds ---" % (time.time() - start_time))
+        print("--- %s seconds ---" % (time.time() - start_time))
         rospy.sleep(5)
 
 #        # Shut down MoveIt cleanly
@@ -202,7 +202,7 @@ class MoveItDemo:
 
     def grasp_attempt(self, tar_att):
 
-        start_time = time.time()
+#        start_time = time.time()
 
         retreat = None
         init_poses = []
@@ -218,7 +218,7 @@ class MoveItDemo:
         grasps = self.grasp_generator(grasp_poses, tar_att)
         for grasp in grasps:
             self.gripper_pose_pub.publish(grasp)
-            rospy.sleep(0.05)
+            rospy.sleep(1)
 
         success = False
         i = 1
@@ -245,7 +245,7 @@ class MoveItDemo:
                 print "Grasping"
                 break
 
-        print("--- %s seconds ---" % (time.time() - start_time))
+#        print("--- %s seconds ---" % (time.time() - start_time))
         return success , retreat
 
 
