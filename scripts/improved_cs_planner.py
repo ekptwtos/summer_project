@@ -906,6 +906,7 @@ class MoveItDemo:
         self.right_arm.go(wait=True)
 
 
+
 if __name__ == "__main__":
     MoveItDemo()
 
